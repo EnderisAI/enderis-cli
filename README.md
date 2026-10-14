@@ -1,6 +1,6 @@
 # Enderis CLI
 
-Release downloads for the `enderis` CLI. The source lives elsewhere; this repository only holds releases.
+Release downloads for the `enderis` CLI. This repository only holds releases.
 
 Install on macOS or Linux:
 
