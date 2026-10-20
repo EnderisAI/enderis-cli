@@ -1,0 +1,14 @@
+{
+  "name": "enderis",
+  "owner": {
+    "name": "Enderis"
+  },
+  "description": "Skills for the Enderis CLI: onboard an agent, write its driver, author evals and playgrounds.",
+  "plugins": [
+    {
+      "name": "enderis",
+      "source": ".",
+      "description": "Skills for the Enderis CLI: onboard an agent, write its driver, author evals and playgrounds."
+    }
+  ]
+}
