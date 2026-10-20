@@ -19,7 +19,8 @@ playgrounds. Web version: https://enderis.ai/docs/evals/build-a-playground.
 Call `get_service_schemas` before you write any row, and build the playground
 with a re-runnable script that writes `playgrounds/<name>/blueprint.yaml`.
 Import it with `enderis import playgrounds/<name>` and fix every error it
-reports.
+reports. The resource opens its blueprint section with a complete example
+that imports as it is: start from it.
 
 ## Rules builders get wrong
 
@@ -28,7 +29,7 @@ reports.
   checked it. If no source has it, leave it out or mark it unverified.
 - **Label simulated data.** Customers, stock, orders and capacity cannot come
   from a public page. Invent them, and say they are simulated where the
-  service has a place for it.
+  service has a place for it, and in the blueprint's top-level `description`.
 - **Depth, not a demo.** A synthetic world has weeks of history: threads with
   replies, sent and read mail, past and upcoming events, chat history. The
   records an eval depends on sit among ordinary noise, and one event shows up

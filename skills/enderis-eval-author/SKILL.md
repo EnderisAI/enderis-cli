@@ -45,26 +45,19 @@ Set up a 30-minute meeting with Alice on Thursday and send her the invite.
 ```
 
 `playground`, `evaluator` and `scripted_fixture` default to those file names.
-`name` must match `@eval(name=...)`.
+`name` must match `@eval(name=...)`, unless the evaluator file registers exactly one
+`@eval`: then it is shared and grades every eval that points at it. A file with several
+`@eval`s errors when none matches.
 
-**The description is labelled lines in a fixed order.** A `|-` block, one or two
-sentences per line, under about 900 characters. The agent never sees it. Every
-fact comes from the seed or the evaluator. No preamble, no restating the
-trigger, no tool-call narration.
-
-- **Ask.** Who wants what, with the names, amounts and dates that matter.
-- **Why it's hard.** The green lights that lure a naive agent. Omit if none.
-- **Deciding rule.** The one fact or policy that decides the case, and its source.
-- **Right answer.** The durable outcome the evaluator grades, with identifiers.
-  Anything the evaluator does not grade stays out.
-- **Fails if** The one or two ways an agent gets it wrong.
+**The description is labelled lines in a fixed order**, as above: Ask, Why it's
+hard (omit if nothing lures the agent), Deciding rule, Right answer, Fails if.
+Every fact comes from the seed or the evaluator; anything the evaluator does not
+grade stays out of Right answer. No preamble, no restated trigger, no tool-call
+narration. Format: https://enderis.ai/docs/evals/writing-evals.
 
 **Mark key records.** List in `key_records:` each seed record the deciding rule
-depends on that no check names, such as a consent or restriction row:
-`{service, collection, id, why}`, with `why` one line. Display-only: the eval
-page shows whether the latest run read it; grading ignores it. "Read" means a
-tool returned that row with its id, so name a row some tool returns whole, not
-one only seen through a summary such as a stock count or price quote.
+depends on that no check names, such as a consent row. Name a row some tool
+returns whole. Display-only; see https://enderis.ai/docs/evals/writing-evals.
 
 **The trigger is a natural opener.** It is delivered verbatim. A real person
 states a problem in their own words and does not recite ids, emails or exact
@@ -80,14 +73,10 @@ was never called; pass alternate spellings as extra arguments. Write facts as
 only when the agent cannot learn it any other way: if the playground holds the
 answer, asking was optional and the check fails a correct run.
 
-**`persona:` is who the simulated person is.** Under `npc:` or a `cast:` entry
-it names a registry persona (`terse`, or `terse@2` to pin a version) or is the
-persona inline, `{name, prompt, model?, voice?}` with a non-empty name and
-prompt and `voice` shaped as in a `persona.md`, stored exactly as written.
-`npc:` without one uses the neutral built-in `cooperative`.
-
-**A cast entry without `listens:` or `interfaces:` inherits its roster entry's.**
-Write `listens: []` for a person who should subscribe to nothing.
+**`persona:` is who the simulated person is**: a registry persona (`terse`,
+`terse@2`) or an inline `{name, prompt}`; without one, the neutral `cooperative`.
+A cast entry without `listens:` inherits its roster entry's; `listens: []`
+subscribes to nothing.
 
 ## playground.yaml
 
@@ -174,11 +163,6 @@ and `record_metric` record and return a truthy or falsy result. Call them as
 statements. `assertion` only decorates your own functions; wrapping a matcher,
 as in `assertion(x.was_called())`, is wrong.
 
-**Judge the transcript, add the rest as evidence.** When several rubrics
-judge the conversation, give each the same `run.transcript` and pass anything
-else a rubric needs (tool calls, records) as `evidence=`. The judge caches the
-content across calls; extras glued onto it defeat the cache.
-
 **Grade outcomes, not tool calls.** Assert on what is durably true in the
 playground after the run (`where=` is exact equality, `containing=` is
 case-insensitive substring, `added`/`removed` diff against the seed). There is
@@ -214,36 +198,27 @@ name against `playground.yaml` yourself.
 
 **Escalations are outcomes.** For an agent run through a driver, `run.outcomes`
 lists each `{kind: "escalated", channel, reason, wake}` the agent reported. Grade
-a hand-off to a human there; its replies are ordinary messages.
+a hand-off to a human there.
 
 **Hand the judge the right text.** `run.transcript` for anything about the
 conversation (asked first, waited, refused). `run.final_answer` only for the last
-reply on its own. For an email the agent wrote, read its text from `db`. A
-judge check passes when `score >= threshold`. Keep times, recipients and counts in
-deterministic checks; use the judge only for meaning.
+reply on its own. For an email the agent wrote, read its text from `db`. Pass
+extra material a rubric needs, such as tool calls, as `evidence=`, never glued
+onto the transcript. Keep times, recipients and counts in deterministic checks;
+use the judge only for meaning.
 
 **Soft-collect by default.** A failed check records and the evaluator keeps
-going, so one run shows every failure. When a check only makes sense if an
-earlier one passed, declare it with `@assertion(depends_on=earlier)` (or a
-list): if `earlier` failed, the dependent is recorded as not reached and never
-gates, so one miss shows as one failure, not a cascade. Call `earlier` first in
-`check()`. Use `require(...)` only to stop everything.
+going. A check that only makes sense if another passed takes
+`@assertion(depends_on=other)`. Use `require(...)` only to stop everything.
 
-**Mark each check critical or minor.** Assertions are critical by default: a
-failed one fails the run. Mark a check minor (`@assertion(severity="minor")`,
-or `minor(outcome)` / `outcome.minor()` on a helper's result) when the task was
-done but done less well: a missing courtesy, a clumsy message, an unneeded
-detail. Wrong records, wrong amounts, broken promises and crossed boundaries
-stay critical. Only minor failures make the run `partial`, which is not a pass.
+**Critical by default.** Mark a check minor (`@assertion(severity="minor")` or
+`minor(outcome)`) only when the task was done but less well; minor failures alone
+make the run `partial`, which is not a pass. Rules:
+https://enderis.ai/docs/evals/assertions#mark-severity-and-dependencies.
 
-**General checks belong in the agent's standards, not in each evaluator.**
-Checks that apply to every conversation (gives a contact route, invents no
-facts, takes no unrequested action, keeps its promises) live in the agent's
-standards file (`agent.md` frontmatter `standards:`), which runs after every
-eval through its `@standard` functions. Do not copy them into an evaluator; the
-evaluator grades what this scenario is about. List the standards that apply to
-the scenario under `standards:` in `eval.md` (all of them unless one cannot
-apply); without the key every standard applies.
+**General checks live in the agent's standards file, not in each evaluator.**
+List the ones that apply under `standards:` in `eval.md`: all of them unless one
+cannot apply to the scenario.
 
 **Prereqs check the agent reached the decision.** `@assertion(prereq=True)`
 checks the agent faced the decision the eval tests; a failed prereq makes the run
@@ -251,14 +226,10 @@ checks the agent faced the decision the eval tests; a failed prereq makes the ru
 the task itself and a seeded record are never prereqs. Rules and an example:
 https://enderis.ai/docs/evals/assertions#mark-prerequisites.
 
-**Metrics never gate.** The verdict passes only when at least one pass/fail
-assertion was recorded and all passed; not-reached assertions never gate. An
-evaluator that records nothing, or only metrics, gets the `error` verdict:
-neither a pass nor a failure, and outside every pass rate. A failing bare
-`assert` fails the `@assertion` it is in (its severity applies); outside one
-it records a failed critical check and stops the evaluator. Any other
-uncaught exception is an evaluator error: the run is `error` unless a
-prerequisite or critical check already failed.
+**Metrics never gate**, and an evaluator that records nothing else gets the
+`error` verdict. A failing bare `assert` is a failed check; any other uncaught
+exception is an evaluator error. Rules:
+https://enderis.ai/docs/evals/assertions#record-metrics-without-gating.
 
 ## scripted.json
 
