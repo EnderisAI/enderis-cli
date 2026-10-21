@@ -23,7 +23,8 @@ uploads metadata, never file contents.
    Running from a package directory prefers that package.
 3. Read the output: source, prompt pointers, boundaries, front-door status. Running
    onboard again refreshes them; unchanged metadata deduplicates.
-4. Choose a connection for each boundary (below), then run an eval:
+4. Declare each boundary's gate variables (below), then run onboard again.
+5. Choose a connection for each boundary (below), then run an eval:
    `enderis run . --list`, then `enderis run . --eval <name>`.
 
 ## Hand-offs
@@ -34,6 +35,36 @@ uploads metadata, never file contents.
 - **The agent needs a playground** (the people, records and data its evals run
   against): use the `enderis-playground-author` skill.
 - **Writing or fixing evals:** use the `enderis-eval-author` skill.
+
+## Declare gate variables
+
+An agent often builds a client only when some variables are set: a token, a
+flag such as `ENABLE_SLACK=true`, a base URL, or a credentials file path. If a
+run cannot set them, the agent never connects and the run reports
+`Not reached: <boundary>`. For a boundary that is not mocked, `enderis run`
+passes your real values only for the gates listed here or found in the code;
+it skips any other name with a warning.
+
+For each boundary in the JSON, open its `constructed_at` file and read the code
+that decides whether the client is built. List every variable it checks. Compare
+the list with the boundary's `gates`. If any is missing or has the wrong kind,
+write `.enderis/boundaries.md` in the package:
+
+```markdown
+---
+boundaries:
+  slack:              # a boundary id from the onboard JSON
+    SLACK_BOT_TOKEN: secret
+    ENABLE_SLACK: flag
+    SLACK_API_URL: url
+    SLACK_CA_BUNDLE: file
+---
+```
+
+Kinds: `secret` (a token or key), `flag` (any non-empty value turns it on),
+`url` (an endpoint), `file` (a path the code opens). Run `enderis onboard . --json`
+again and check that `gates` now lists them. Never edit the agent's code to
+change how it connects.
 
 ## Choose a connection for each boundary
 
