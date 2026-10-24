@@ -35,14 +35,18 @@ Answer these before writing code. Write the answers into the body of
    API)? Or only a test harness (a simulator, an events API)? Prefer the real
    one. Set `front_door: production` or `harness` honestly; the run page shows it.
 3. **Start.** How does the app start without edits? Find the existing compose
-   file, script or command and the environment it reads. You start the app
-   yourself before the run (`app: attached`).
+   file, script or command and the environment it reads. Either you start the
+   app yourself before the run (`app: attached`), or the driver's `start` and
+   `stop` hooks start and stop one copy of it per run slot (`app: managed`).
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
-5. **Isolation.** Can each run use its own namespace in the shared app (chat
-   ids, user ids, tenant)? Derive them from the run id. Find how to read only
-   that namespace's output. Without this, runs leak into each other: stop.
+5. **Isolation.** The default is `isolation: exclusive`: one run at a time uses
+   the app. Use `isolation: namespace` only when each run gets its own
+   namespace in the shared app (chat ids, user ids, tenant) derived from the
+   run id, the driver reads only that namespace's output, and the app keeps no
+   other state one run can change for another. To run evals in parallel
+   against an app that keeps state, use `app: managed`.
 6. **Outcomes.** Besides messages, what can the agent do that an eval must see?
    A hand-off to a human is an escalation, which the driver reports. An eval
    sees only channel messages (replies and the simulated people's messages),
@@ -61,7 +65,18 @@ asks; then pass `--driver <dir>` to `enderis onboard`. Then:
 - `driver.md`: set `name`, `description` (for people), `command` (it runs in
   the driver directory), the `settings` it reads (environment variable names
   such as the app URL, never model keys or `PYTHONPATH`), and `files` (every
-  file the driver needs). Keep `app: attached` and `isolation: namespace`.
+  file the driver needs). Keep `app: attached` and `isolation: exclusive`;
+  change to `namespace` only when triage item 5 allows it.
+- For `app: managed`, add `start` and `stop` (lists that run in the driver
+  directory; list their scripts in `files`). `start` exits 0 only when the copy
+  is ready; `stop` removes the copy and succeeds when there is nothing to stop.
+  Both hooks and the driver get `ENDERIS_SLOT`, `ENDERIS_APP_PORT` (the copy's
+  port), `ENDERIS_INSTANCE` (use it for the compose project name and state
+  files) and `ENDERIS_REPO` (the full path of the folder you onboarded), plus `HOME`, `USER`
+  and the `DOCKER_*` variables. `stop` must reach what its `start` made even if
+  the environment changed in between (for example the default Docker context):
+  record what it needs at `start`, keyed by `ENDERIS_INSTANCE`, and exit
+  non-zero when it cannot reach it.
 - `driver.py`: change the requests marked TODO. Keep these parts as they are:
   - every chat id or user id comes from `ctx.run_id`;
   - when `wake["waiting"]` is above zero, the driver may hold back the app's
@@ -118,4 +133,6 @@ run appears in it.
 - Never put a secret in `driver.md`. Settings name variables; values come from
   the environment.
 - Never acknowledge the app's output for a wake Enderis did not accept.
+- If an `enderis` command fails and the fix is not clear, run `enderis faq`
+  before you try again.
 - Never commit or push unless asked.

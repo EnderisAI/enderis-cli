@@ -6,7 +6,7 @@ settings: [APP_URL]
 files: [driver.md, driver.py]
 front_door: harness
 app: attached
-isolation: namespace
+isolation: exclusive
 ---
 How to start the app: `docker compose up` from the agent repository (no change
 to the agent's code or config). It listens on APP_URL.

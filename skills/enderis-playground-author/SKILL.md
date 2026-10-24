@@ -19,8 +19,9 @@ playgrounds. Web version: https://enderis.ai/docs/evals/build-a-playground.
 Call `get_service_schemas` before you write any row, and build the playground
 with a re-runnable script that writes `playgrounds/<name>/blueprint.yaml`.
 Import it with `enderis import playgrounds/<name>` and fix every error it
-reports. The resource opens its blueprint section with a complete example
-that imports as it is: start from it.
+reports; if an error is not clear, run `enderis faq`. The resource opens its
+blueprint section with a complete example that imports as it is: start from
+it.
 
 ## Rules builders get wrong
 

@@ -101,9 +101,10 @@ services:
   in the stored playground; the delta carries this scenario's decision and trap.
   The trigger is the first runtime post, not seed data.
 - **Dates come from the playground clock.** The stored playground declares an
-  `epoch:`. Seed timestamps agree with it and carry a UTC offset. If the trigger
-  says "tomorrow", either state the absolute date or make sure the agent has a
-  tool that tells it the time. Otherwise the run grades the model's calendar.
+  `epoch:`. Seed timestamps agree with it and carry a UTC offset. A hosted
+  agent reads the time through its built-in `clock.now`. A repository
+  agent reads its own machine's clock, so if the trigger says "tomorrow", state
+  the absolute date. Otherwise the run grades the agent's own calendar.
 - **Money is decimal dollars in yaml** (`balance: 120.00`). Tools and snapshots
   use integer cents (`balance_cents: 12000`), so assert in cents.
 
@@ -283,6 +284,9 @@ Open the printed run link and read **Assertions** first: one row per assertion,
 each check with expected against actual where recorded. Then read the
 conversation. A failure means the agent and the test disagree, and the test can
 be wrong. Unrunnable means a setup problem. See https://enderis.ai/docs/quickstart.
+
+If an `enderis` command or MCP call fails and the fix is not clear, run
+`enderis faq` (MCP: read `enderis://docs/agent-faq`) before you try again.
 
 ## Checklist before importing
 

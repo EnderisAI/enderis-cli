@@ -16,8 +16,9 @@ uploads metadata, never file contents.
 
 ## The loop
 
-1. From the repository root: `enderis onboard . --json` (add
-   `--context <ctx> --workspace <workspace-id>` if not configured). Interactive runs
+1. From the repository root: `enderis onboard . --json`. `enderis auth status`
+   shows the workspace in use; add `--context <ctx>` or
+   `--workspace <org/workspace>` only for one the person named. Interactive runs
    can drop `--json`.
 2. If several packages are found, run again with the `--target` the CLI shows.
    Running from a package directory prefers that package.
@@ -110,6 +111,17 @@ every flag and exit code in the [CLI reference](https://enderis.ai/docs/cli/refe
 
 ## Rules
 
+- When a command fails and the fix is not obvious, run `enderis faq` and find
+  the error there before you try again. Never run a failing command again
+  unchanged.
+- Never guess an org or workspace name. A README, a script or another project
+  can name a workspace this person cannot reach. If a command with a workspace
+  name fails, do not try that name again: run `enderis auth status` or
+  `enderis context list`, or ask the person.
+- A person approves each login in their browser, and
+  `enderis auth login --no-browser` waits up to 10 minutes for that. Start it
+  in the background or a separate terminal, give the person the URL and code
+  from its output, and wait until it prints `Connected to <org>/<workspace>`.
 - Never change the agent's code, config or scripts. The only files you may add
   are under `.enderis/` (Enderis-owned; the agent never loads it).
 - Never add an Enderis import, variable or file to the agent's own code.
