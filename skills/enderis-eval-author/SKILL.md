@@ -228,9 +228,16 @@ the task itself and a seeded record are never prereqs. Rules and an example:
 https://enderis.ai/docs/evals/assertions#mark-prerequisites.
 
 **Metrics never gate**, and an evaluator that records nothing else gets the
-`error` verdict. A failing bare `assert` is a failed check; any other uncaught
-exception is an evaluator error. Rules:
+`error` verdict. Any other uncaught exception is an evaluator error. Rules:
 https://enderis.ai/docs/evals/assertions#record-metrics-without-gating.
+
+**Put every `assert` inside an `@assertion` function.** There, a failing `assert`
+fails that assertion. A bare `assert` directly in `check` stops the evaluator at
+that line and skips every later check. Validation (**Run draft** and **Import
+eval** in Create Eval, and the MCP tools `validate_eval`, `create_eval` and
+`build_eval`) refuses an evaluator whose bare `assert` fails in its trial run on
+the untouched seed. Plain `enderis import` does not run the evaluator, so it does
+not catch this.
 
 ## scripted.json
 
@@ -253,12 +260,36 @@ A fixture replays the intended agent so the eval tests itself, free and keyless.
 }
 ```
 
+- **Persona entries are strict.** `reply` is required (`""` stays silent);
+  only `satisfied`, `give_up` and `form_values` may join it.
 - **One user reply per no-tool agent turn.** A turn with tool calls keeps
   control and gets no reply. Turns 0 and 2 above face the user: two replies.
 - **Disclosures contain the fact text** `asked_before` looks for ("Tran").
 - **Tool names are `product.tool`**, validated at import. `judge` entries answer
   `judge.with_rubric` calls in order. Replay runs at seed 0, so run-generated
   ids like `msg-0-1` only match there; evaluators must not depend on them.
+
+## Voice agents
+
+An agent that answers the phone gets calls, not chats: each eval is a live call
+between the agent's voice and the simulated caller's voice. The trigger channel
+is `voice:call:<agent principal>`, the eval's `listens` is `voice:call:<caller>`,
+the caller's own `listens` is `voice:call:<agent principal>`, and the playground
+seeds the `voice` service. Read the rules before writing one:
+https://enderis.ai/docs/evals/writing-evals#voice-evals (MCP: the resource
+`enderis://docs/authoring-brief`).
+
+- **Grade what the caller heard**, from `run.call` and `run.timeline`, not
+  only what the agent said. Every call already gets a `call_experience` check;
+  do not write your own. Never grade the pauses between turns.
+- **Do not make the scenario depend on an id the caller must say aloud** (an
+  email, an order number). Speech recognition mangles it. Seed it where the agent
+  can read it.
+- **`scripted.json` needs a `call`.** A scripted voice run replays a call
+  timeline recorded from one live run of the eval, so the fixture carries that
+  `call` next to `turns` and `judge`. Without a recording from a live run, leave
+  `scripted.json` out: import and launch refuse a voice fixture that has no
+  `call`. A scripted voice run tests the pipeline, not the voice.
 
 ## Submit, run and read results
 

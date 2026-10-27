@@ -46,7 +46,10 @@ Answer these before writing code. Write the answers into the body of
    namespace in the shared app (chat ids, user ids, tenant) derived from the
    run id, the driver reads only that namespace's output, and the app keeps no
    other state one run can change for another. To run evals in parallel
-   against an app that keeps state, use `app: managed`.
+   against an app that keeps state, use `app: managed`. A driver written before
+   `exclusive` existed has `namespace`; check it against this rule. With
+   `namespace`, a command that runs more than one run at once warns that the
+   runs use the same app.
 6. **Outcomes.** Besides messages, what can the agent do that an eval must see?
    A hand-off to a human is an escalation, which the driver reports. An eval
    sees only channel messages (replies and the simulated people's messages),
