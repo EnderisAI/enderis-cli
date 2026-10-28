@@ -268,6 +268,10 @@ A fixture replays the intended agent so the eval tests itself, free and keyless.
 - **Tool names are `product.tool`**, validated at import. `judge` entries answer
   `judge.with_rubric` calls in order. Replay runs at seed 0, so run-generated
   ids like `msg-0-1` only match there; evaluators must not depend on them.
+- **Gmail keeps one copy of a message per mailbox.** A recipient's copy is
+  `{id}~{mailbox}`, so a scripted read or reply names the agent's copy
+  (`msg-0-1~avery@enderis.ai`). In an evaluator, filter by `mailbox` before you
+  count mail or read its labels: `.added("messages", key="id").where(mailbox=...)`.
 
 ## Voice agents
 
