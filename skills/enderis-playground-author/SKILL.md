@@ -27,7 +27,9 @@ it.
 
 - **Never invent a sourced fact.** A product spec, price, policy rule or
   document line comes from a public source, with its URL and the date you
-  checked it. If no source has it, leave it out or mark it unverified.
+  checked it, or from a transcript or document the user gave you, cited by
+  its id and a timestamp, page or section. If no source has it, leave it out
+  or mark it unverified.
 - **Label simulated data.** Customers, stock, orders and capacity cannot come
   from a public page. Invent them, and say they are simulated where the
   service has a place for it, and in the blueprint's top-level `description`.

@@ -24,7 +24,8 @@ uploads metadata, never file contents.
    Running from a package directory prefers that package.
 3. Read the output: source, prompt pointers, boundaries, front-door status. Running
    onboard again refreshes them; unchanged metadata deduplicates.
-4. Declare each boundary's gate variables (below), then run onboard again.
+4. Declare any boundary onboarding missed and each boundary's gate variables
+   (both below), then run onboard again.
 5. Choose a connection for each boundary (below), then run an eval:
    `enderis run . --list`, then `enderis run . --eval <name>`.
 
@@ -66,6 +67,53 @@ Kinds: `secret` (a token or key), `flag` (any non-empty value turns it on),
 `url` (an endpoint), `file` (a path the code opens). Run `enderis onboard . --json`
 again and check that `gates` now lists them. Never edit the agent's code to
 change how it connects.
+
+## Declare a boundary onboarding missed
+
+Onboarding finds common MCP client patterns on its own. It does not follow
+config objects or helper functions, so it can miss a client whose server comes
+from a config value. Do this when the JSON lists `unresolved_clients`, or when
+the code clearly builds an MCP client that is not in `boundaries`:
+
+1. Open each constructor (`new Client(`, `new StdioClientTransport(`,
+   `MCPServerStdio(` and similar). Declarations cover clients matched by
+   server package or URL; a langchain `MultiServerMCPClient` cannot be
+   declared.
+2. Trace the transport arguments to the real server: the package or executable
+   a stdio transport launches, or the URL an HTTP transport opens. Follow config
+   defaults and environment schemas until you reach a literal value.
+3. Add a `declare` block to `.enderis/boundaries.md`, next to the boundary's
+   gate variables:
+
+   ```yaml
+   boundaries:
+     calendar:
+       declare:
+         transport: stdio                     # stdio | streamable_http | sse
+         constructed_at: src/mcp.ts:114       # path:line in the package
+         server: "@cocal/google-calendar-mcp" # stdio: the package it launches
+       GOOGLE_OAUTH_CREDENTIALS: file
+     slack:
+       declare:
+         transport: streamable_http
+         constructed_at: src/mcp.ts:172
+         url: https://mcp.slack.com/mcp       # HTTP: the URL it opens
+       SLACK_MCP_ACCESS_TOKEN: secret
+   ```
+
+4. Run `enderis onboard . --json` again. The CLI checks each claim against the
+   source: the constructor is on that line or the 5 after it and matches the
+   transport (`constructed_at`), the server is a whole word of a string literal
+   in the source, scope and version included, or the URL starts a string
+   literal (`server_literal`, `url_literal`), and every gate variable is read
+   somewhere (`gate_read`). A claim that fails is listed in
+   `declaration_errors` with what the CLI found there; the others still count.
+5. Fix each error and onboard again until `declaration_errors` is empty.
+
+If an unresolved constructor only builds transports for boundaries onboarding
+already reports (for example a shared helper fed by a server map it found),
+it needs no declaration. Use `declare` only for an id that is not in
+`boundaries`. Never edit the agent's code to make a declaration pass.
 
 ## Choose a connection for each boundary
 

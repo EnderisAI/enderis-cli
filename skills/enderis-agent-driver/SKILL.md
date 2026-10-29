@@ -24,6 +24,11 @@ config, scripts or prompts. You may start it with your own compose file or
 environment overrides. If the agent cannot be reached without a change, stop
 and report the gap.
 
+A driver is for a front door onboarding cannot drive. If the front door works
+but onboarding missed some of the agent's MCP clients, do not write a driver:
+declare those boundaries as the `enderis-onboard` skill describes ("Declare a
+boundary onboarding missed").
+
 ## 1. Triage
 
 Answer these before writing code. Write the answers into the body of
