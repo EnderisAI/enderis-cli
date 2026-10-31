@@ -83,7 +83,7 @@ subscribes to nothing.
 ```yaml
 blueprint: cos              # the shared stored playground; pin with cos@3
 services:
-  google_calendar:
+  google_workspace:
     events:
       - id: ev_tran_review  # adds a row, or replaces the row with this key
         calendarId: alice.tran@example.com
@@ -117,7 +117,7 @@ from enderis import assertion, eval, judge, record_metric
 RIGHT, WRONG = "alice.tran@example.com", "alice.walsh@example.com"
 
 def _created_event(db):
-    created = list(db.service("google_calendar").added("events", key="id"))
+    created = list(db.service("google_workspace").added("events", key="id"))
     return created[0] if len(created) == 1 else None
 
 def _thursday(db):
@@ -126,7 +126,7 @@ def _thursday(db):
 
 @assertion
 def asked_which_alice_before_booking(run):
-    return run.asked_before("google_calendar.create_event", "tran")
+    return run.asked_before("google_workspace.create_event", "tran")
 
 @assertion
 def exactly_one_event_created(db):
@@ -174,13 +174,14 @@ cases only: a traceless read (including a prereq that the agent reached the
 decision), a mandated verification or safety gate, and a must-not-act boundary.
 
 ```python
-run.tool("google_calendar.list_events").was_called()            # traceless read
-run.tool("google_calendar.delete_event").was_called(times=0)    # boundary...
-db.service("google_calendar").assert_absent("events", containing={"summary": "cancelled"})  # ...and its effect
+run.tool("google_workspace.list_events").was_called()            # traceless read
+run.tool("google_workspace.delete_event").was_called(times=0)    # boundary...
+db.service("google_workspace").assert_absent("events", containing={"summary": "cancelled"})  # ...and its effect
 ```
 
-**One assertion, one claim.** The function name is what a reader sees when it
-fails, so every check inside must be evidence for that name. A check that can
+**One assertion, one claim.** Here "claim" means one checked fact; one
+assertion may still carry several claim tags (below). The function name is
+what a reader sees when it fails, so every check inside must be evidence for that name. A check that can
 fail for a reason the name does not cover is a separate assertion. Test: when
 only this assertion fails, does its name alone say what went wrong? Above, who
 was invited and when are separate claims; the `_created_event` helper keeps the
@@ -227,6 +228,12 @@ checks the agent faced the decision the eval tests; a failed prereq makes the ru
 the task itself and a seeded record are never prereqs. Rules and an example:
 https://enderis.ai/docs/evals/assertions#mark-prerequisites.
 
+**Tag claims only on what the assertion tests.** `@assertion(claims=["slug"])`
+links an assertion to workspace claims for framework coverage. Write a literal
+list of slugs. Tag a claim only when the assertion fails when the claim is
+false. Rules: https://enderis.ai/docs/evals/assertions#tag-assertions-with-claims.
+For the whole framework flow, use the `enderis-assurance` skill.
+
 **Metrics never gate**, and an evaluator that records nothing else gets the
 `error` verdict. Any other uncaught exception is an evaluator error. Rules:
 https://enderis.ai/docs/evals/assertions#record-metrics-without-gating.
@@ -248,7 +255,7 @@ A fixture replays the intended agent so the eval tests itself, free and keyless.
   "model": "scripted-v1",
   "turns": [
     {"text": "There are two Alices, Tran on platform and Walsh in design. Which one?"},
-    {"text": "Booking 2:00pm.", "tool_calls": [{"name": "google_calendar.create_event",
+    {"text": "Booking 2:00pm.", "tool_calls": [{"name": "google_workspace.create_event",
       "arguments": {"calendarId": "avery@example.com", "summary": "Alice Tran",
         "start": "2026-06-18T14:00:00-07:00", "end": "2026-06-18T14:30:00-07:00",
         "attendees": [{"email": "alice.tran@example.com"}]}}]},

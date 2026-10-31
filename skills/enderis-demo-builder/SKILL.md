@@ -109,7 +109,9 @@ For each system in the brief, pick a service:
 
 1. Call `get_service_schemas` and use a built-in service when one fits
    (mail, calendar, chat, CRM, tickets, commerce, claims, documents and
-   others).
+   others). Google mail and calendar are one service, `google_workspace`: a
+   customer on Google gets both, so never model a Google calendar without its
+   mailbox.
 2. Put customer documents and policies in the built-in `doc_library`.
 3. Write a custom service only when no built-in fits. Read section 8,
    "Authoring a mocked service", of the MCP resource

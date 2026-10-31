@@ -115,6 +115,42 @@ already reports (for example a shared helper fed by a server map it found),
 it needs no declaration. Use `declare` only for an id that is not in
 `boundaries`. Never edit the agent's code to make a declaration pass.
 
+## Declare a REST API boundary (`transport: http`)
+
+Onboarding finds MCP clients only. An agent that calls a REST API with its own
+`fetch`, or with a vendor SDK built on it, has no boundary for that API, and
+its calls reach production. A run reports each such call as
+`unmodeled_egress` with the origin it reached. When a run reports
+`unmodeled_egress`, declare that origin:
+
+```yaml
+boundaries:
+  whatsapp-cloud:
+    declare:
+      transport: http
+      constructed_at: src/whatsapp.ts:12   # path:line where the client is built
+      url: https://graph.facebook.com      # the origin: scheme, host, port only
+      package: "@acme/whatsapp-sdk"        # only when a vendor SDK builds it
+      interface: whatsapp-cloud-http       # only when the origin picks no interface
+    WHATSAPP_TOKEN: secret
+    WHATSAPP_BASE_URL: url                 # a config variable that holds the base URL
+```
+
+- You decide where the client is built; the CLI checks only that `url` is an
+  origin with no credentials, path or query (`origin`), that the
+  `constructed_at` file exists, and that each gate variable is read
+  (`gate_read`).
+- If the base URL comes from configuration, list that variable as a `url` gate.
+- Onboarding picks the interface whose production origin equals `url`. When no
+  interface or more than one has it, the error is `declaration_needed`: add
+  `interface:` with a name from the message.
+- `execution_status` is `ready` only when Enderis ships an origin adapter for
+  the package's language (today: Node `fetch`); otherwise it is
+  `needs_substitution`, an Enderis gap to report.
+- An Enderis API that does not accept HTTP boundaries yet stops onboarding
+  with "does not accept transport: http boundaries yet". Remove those
+  `declare` blocks to onboard without them.
+
 ## Choose a connection for each boundary
 
 Open the agent's **Connections** section in Agent Details. Each boundary gets one
@@ -140,6 +176,10 @@ Reference: https://enderis.ai/docs/agents/onboarding.
 The front door works, but Enderis has no shipped adapter that can redirect the
 agent's API client. Onboarding reports this with the source evidence. It is an
 Enderis gap: report it, do not patch the agent to work around it.
+
+A REST client that onboarding did not find does not cause this status. Its
+calls reach production, and a run reports them as `unmodeled_egress`: declare
+that origin as a `transport: http` boundary (see above).
 
 ## Which side is the blocker on?
 
