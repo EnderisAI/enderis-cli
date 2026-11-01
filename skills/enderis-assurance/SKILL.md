@@ -19,8 +19,9 @@ https://enderis.ai/docs/evals/claims.
 ## The model
 
 - A **framework** is a list of **controls**, loaded into the workspace. Each
-  control has a kind: `testable`, `third_party_testing` or `policy`. Only
-  `testable` controls get coverage.
+  control has a kind: `testable`, `third_party_testing` or `policy`.
+  `testable` and `third_party_testing` controls get coverage. A
+  `third_party_testing` control counts as tested only by runs a third party starts.
 - A **claim** is one testable sentence about the agent, with a slug, such as
   `no-unrequested-record-writes`. It names no framework.
 - A **map row** links one control to one claim. You propose rows; a person
@@ -66,7 +67,9 @@ https://enderis.ai/docs/evals/claims.
 `claims.yaml`. A slug is lowercase letters, digits and single hyphens. A slug
 that exists is updated in place, and putting it again without `description`
 clears the description. Leave `status` out: a new claim starts as `proposed`,
-and approving a map row makes it `active`.
+and approving a map row makes it `active`. A file with `status` gets 403.
+If you change the statement of a claim that has approved map rows, those
+rows go back to `proposed` and the person must approve them again.
 
 ```yaml
 claims:
@@ -123,7 +126,8 @@ def changed_only_the_requested_record(db):
 
 ## Reading gaps
 
-Gaps cover only `testable` controls whose state is `selected`. Each gap has a
+Gaps cover only `testable` and `third_party_testing` controls whose state is
+`selected`. Each gap has a
 `kind`:
 
 | Kind | What to do |
@@ -142,6 +146,11 @@ runs, so run it again after each import that changes it.
 - Never write framework or control text from memory or from a licensed
   catalog. Read controls from the workspace.
 - Never set a claim's `status`, and never approve map rows. A person decides.
+  You also cannot remove an approved map row or change a control's kind
+  (403); ask the person. If you change a control's title, its approved map
+  rows go back to `proposed`.
+- Always import your evals with `--authored-by coding-agent`. Without it, the
+  author is not stated.
 - Never pass `--provider scripted` for these runs. Scripted runs never count.
 - Do not tag an assertion to make a gap go away. The auditor reads the tags.
 - Over MCP, the same reads are `claims_list`, `framework_controls` and
