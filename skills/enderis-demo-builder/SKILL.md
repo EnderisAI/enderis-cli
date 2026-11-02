@@ -41,9 +41,11 @@ standards/<name>.py               # optional checks every run is graded on
 
 `discovery/` and `brief.md` stay in this repository. `enderis import` reads
 only `services/`, `personas/`, `playgrounds/`, `agents/` and `evals/`, plus the
-agent's `standards:` file. Customer material reaches Enderis only where you put
-it into those files: the agent's prompt, the evals, and the playground (for
-example a policy document seeded into `doc_library`).
+agent's `standards:` file. It reads each service, playground and eval only
+from its own folder, and fails one with a symbolic link that leads out of it.
+Customer material reaches Enderis only where you put it into those files: the
+agent's prompt, the evals, and the playground (for example a policy document
+seeded into `doc_library`).
 
 ## Steps
 
@@ -195,8 +197,9 @@ Report to the user:
 - the **Assumed** claims and **Open questions** from the brief.
 
 Tell them they can try the demo agent by hand: `enderis chat --agent <name>`,
-or **New chat** on the agent's **Chats** tab in the web app. The web app works
-for a customer with no CLI.
+or the agent's **Chats** tab in the web app. There, **Load eval** starts a chat
+from one of the demo's evals, with **Answer for me** and **Evaluate**. The web
+app works for a customer with no CLI.
 
 Tell them how to show the demo to the customer:
 

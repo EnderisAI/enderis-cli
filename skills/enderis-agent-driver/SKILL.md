@@ -128,8 +128,9 @@ Open the printed run link.
 - **Front door and app:** check they say what the driver really does.
 - **Failures:** an agent failure or agent timeout is the app's side (down,
   error, slow). An Enderis error at the driver is the driver's side (crash,
-  a bad result, a deadline missed by the driver). Read the stop log for output
-  the driver held but could not deliver.
+  a bad result, a deadline missed by the driver). `AgentTimeout` raised in
+  `start` is an Enderis error too: the app never started, so the run is not
+  graded. Read the stop log for output the driver held but could not deliver.
 
 Then run a second eval right after the first and confirm nothing from the first
 run appears in it.

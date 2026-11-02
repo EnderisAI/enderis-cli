@@ -151,6 +151,19 @@ boundaries:
   with "does not accept transport: http boundaries yet". Remove those
   `declare` blocks to onboard without them.
 
+## No boundaries found
+
+If onboarding finds no boundary and the front door is ready, it does not
+register the agent until someone confirms that the agent calls no API or MCP
+server. Otherwise every run would reach the real services, and the evaluator
+would see the eval's seed data unchanged. At a terminal without `--json`,
+onboarding asks. Without a terminal, or with `--json`, it stops with exit
+code 2 and lists any unresolved MCP clients and rejected declarations.
+
+- Read the code first. If it calls an API or MCP server, declare that boundary
+  (above) and onboard again.
+- Pass `--no-boundaries` only when the code calls none, or the person says so.
+
 ## Choose a connection for each boundary
 
 Open the agent's **Connections** section in Agent Details. Each boundary gets one
@@ -161,7 +174,12 @@ choice. A run stops before it starts while any boundary still needs one.
 - **Not mocked:** the agent calls the real service. Enderis records the calls
   but seeds nothing. Use only when that service is safe to call from a test.
 - **Routed to your own host:** runs reach an MCP URL you give, such as your
-  staging system. The URL must carry no credential.
+  staging system. The URL must carry no credential. By default a run removes
+  the credentials the agent configured on its client (its headers and auth
+  settings) from that connection; a credential in a REST path or body still
+  travels. To keep them, the owner lists the origin (`https://host[:port]`),
+  one per line, in the repository's `.enderis/credential-hosts`. A file in the
+  package replaces the root file. Never add an origin the owner did not name.
 
 From the terminal, `enderis connections list` shows each boundary and its
 candidate adapters, best match first. `enderis connections set <boundary>`
