@@ -168,16 +168,27 @@ in both directions. Every eval has a `scripted.json`, except a voice eval
 without a recorded call (see the eval-author skill). Use rules shared by every scenario as
 standards in `standards/<name>.py`, not as copies in each evaluator.
 
-### 8. Import and run
+### 8. Import, then run once
+
+Live runs are slow. Build and import everything first, so the whole demo is
+in the web app before any live run starts:
 
 ```sh
 enderis import . --acceptance
-enderis test --agent <name>
 ```
 
 Fix every import error. Run each eval once with `--provider scripted`
 (`enderis run --agent <name> --eval <eval> --provider scripted`) to prove
-the evaluator. Then read each live failure:
+the evaluator.
+
+Then give the user the workspace link and offer one live run of the
+acceptance set. Do not start it without their yes, and do not repeat it:
+
+```sh
+enderis test --agent <name>
+```
+
+Read each live failure:
 
 - **Eval fault** (wrong seed, a check that grades the wrong thing, a judge
   rubric that is too loose or too strict): fix the eval and import again.
@@ -198,8 +209,9 @@ Report to the user:
 
 Tell them they can try the demo agent by hand: `enderis chat --agent <name>`,
 or the agent's **Chats** tab in the web app. There, **Load eval** starts a chat
-from one of the demo's evals, with **Answer for me** and **Evaluate**. The web
-app works for a customer with no CLI.
+from one of the demo's evals, with **Evaluate**. Every web chat drafts the
+person's next message into the box, and **Autopilot** sends the drafts by
+itself. The web app works for a customer with no CLI.
 
 Tell them how to show the demo to the customer:
 

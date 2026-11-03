@@ -207,7 +207,8 @@ conversation (asked first, waited, refused). `run.final_answer` only for the las
 reply on its own. For an email the agent wrote, read its text from `db`. Pass
 extra material a rubric needs, such as tool calls, as `evidence=`, never glued
 onto the transcript. Keep times, recipients and counts in deterministic checks;
-use the judge only for meaning.
+use the judge only for meaning. One evaluation gets at most 100 judge calls of
+at most 1 MiB of text each.
 
 **Soft-collect by default.** A failed check records and the evaluator keeps
 going. A check that only makes sense if another passed takes

@@ -145,7 +145,7 @@ boundaries:
   interface or more than one has it, the error is `declaration_needed`: add
   `interface:` with a name from the message.
 - `execution_status` is `ready` only when Enderis ships an origin adapter for
-  the package's language (today: Node `fetch`); otherwise it is
+  the package's language (today: Node `fetch`, and Python `httpx` and `requests`); otherwise it is
   `needs_substitution`, an Enderis gap to report.
 - An Enderis API that does not accept HTTP boundaries yet stops onboarding
   with "does not accept transport: http boundaries yet". Remove those
