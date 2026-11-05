@@ -80,9 +80,10 @@ asks; then pass `--driver <dir>` to `enderis onboard`. Then:
   is ready; `stop` removes the copy and succeeds when there is nothing to stop.
   Both hooks and the driver get `ENDERIS_SLOT`, `ENDERIS_APP_PORT` (the copy's
   port), `ENDERIS_INSTANCE` (use it for the compose project name and state
-  files) and `ENDERIS_REPO` (the full path of the folder you onboarded), plus `HOME`, `USER`
-  and the `DOCKER_*` variables. `stop` must reach what its `start` made even if
-  the environment changed in between (for example the default Docker context):
+  files) and `ENDERIS_REPO` (the full path of the folder you onboarded), plus `HOME`, `USER`,
+  the `DOCKER_*` variables and the CA paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`,
+  `REQUESTS_CA_BUNDLE`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`). `stop` must reach what its
+  `start` made even if the environment changed in between (for example the default Docker context):
   record what it needs at `start`, keyed by `ENDERIS_INSTANCE`, and exit
   non-zero when it cannot reach it.
 - `driver.py`: change the requests marked TODO. Keep these parts as they are:

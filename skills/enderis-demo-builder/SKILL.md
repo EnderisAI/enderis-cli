@@ -114,6 +114,8 @@ For each system in the brief, pick a service:
    others). Google mail and calendar are one service, `google_workspace`: a
    customer on Google gets both, so never model a Google calendar without its
    mailbox.
+   SharePoint and OneDrive are one service, `microsoft_365`: each person
+   with an email gets a OneDrive, and a Microsoft 365 group gets a team site.
 2. Put customer documents and policies in the built-in `doc_library`.
 3. Write a custom service only when no built-in fits. Read section 8,
    "Authoring a mocked service", of the MCP resource
@@ -145,7 +147,7 @@ name: <customer>-<job>
 kind: vendor
 vendor:
   platform: langgraph
-  model: gpt-5.6-luna
+  model: gpt-6-luna
   credentials_ref: OPENAI_API_KEY
 interfaces:
   - {service: doc_library, interface: doc_library-canonical}
