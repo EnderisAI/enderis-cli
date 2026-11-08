@@ -317,7 +317,14 @@ Three paths store an eval:
   self-test, which must pass.
 - **MCP** from a coding agent: `get_authoring_packet`, `validate_eval` while
   drafting, then `create_eval` with `scripted_json` to launch the seed-0
-  self-test; poll the returned `run_id` with `get_run` until it passes.
+  self-test; poll the returned `run_id` with `get_run` until it passes. To test
+  a production gap, pass `finding_id` to `get_authoring_packet`. The finding
+  holds state, identifier-shaped names and counts, and what production does is
+  not the right answer: ask the user for the outcome before you write
+  assertions, and grade that outcome, not that the agent called the tool.
+  `create_eval` does not close the gap. Tell the user to tick Acceptance on the
+  agent's Evals tab, run the eval, then press Refresh snapshot, which needs
+  `manage_observation_sources`.
 
 ```sh
 enderis run . --list                          # from the onboarded agent's repo

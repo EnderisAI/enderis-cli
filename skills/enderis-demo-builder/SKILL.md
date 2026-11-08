@@ -4,9 +4,10 @@ description: >-
   Build a customer demo in Enderis from discovery material: call transcripts,
   customer documents and web research become a cited brief, a hosted demo
   agent, a playground and evals that run in an Enderis workspace. Use when a
-  systems integrator, agency or dev shop asks to prototype an agent for a
-  prospect, turn a discovery call into a demo, or replace a PRD with a working
-  example the customer can review.
+  salesperson or engineer at a systems integrator, agency or dev shop asks to
+  build an Enderis demo, prototype an agent for a prospect, turn a discovery
+  call into a demo, or replace a PRD with a working example the customer can
+  review.
 ---
 
 # Building a customer demo
@@ -21,10 +22,23 @@ Enderis workspace with three parts:
 The evals are the demo now and the acceptance tests later: when the real
 agent is built, the same evals grade it.
 
-Work in the integrator's own repository and in a workspace of the
-integrator's own organization. Check the workspace with `enderis auth status`.
+Work in the folder the user gave you and in a workspace of the
+integrator's own organization.
 
-## Repository layout
+## Who you work for
+
+The user is often a salesperson, not an engineer. Write to them in plain
+words:
+
+- Say "folder", not "repository". Say "tests", not "evals", and "practice
+  world", not "playground". Do not mention git, the CLI, MCP or import.
+- Run every command yourself. Never ask the user to type a command or edit a
+  file. When a command needs their OK, say in one sentence what it does.
+- Do not ask them to use git or make a repository. A plain folder is enough.
+- Ask them only what they can answer: facts about the customer, a choice of
+  workspace, a yes before a long run.
+
+## Folder layout
 
 ```text
 discovery/sources.md              # one row per source, with a source id
@@ -39,7 +53,7 @@ evals/<eval>/                     # eval.md, playground.yaml, evaluator.py, scri
 standards/<name>.py               # optional checks every run is graded on
 ```
 
-`discovery/` and `brief.md` stay in this repository. `enderis import` reads
+`discovery/` and `brief.md` stay in this folder. `enderis import` reads
 only `services/`, `personas/`, `playgrounds/`, `agents/` and `evals/`, plus the
 agent's `standards:` file. It reads each service, playground and eval only
 from its own folder, and fails one with a symbolic link that leads out of it.
@@ -49,11 +63,47 @@ seeded into `doc_library`).
 
 ## Steps
 
+### 0. Setup
+
+Do this yourself, every time, before anything else. Each check is quick when
+the step is already done.
+
+1. **CLI.** Run `enderis --version`. If it fails, install it:
+   `curl -fsSL https://enderis.ai/install.sh | sh`. If the installer stops
+   because `minisign` is missing, install minisign (`brew install minisign`
+   on a Mac with Homebrew, `sudo apt install minisign` on Debian or Ubuntu)
+   and run the installer again. The installer puts `enderis` in
+   `~/.local/bin`; if that is not on your `PATH`, call it by its full path.
+   The installer also installs the Enderis skills.
+2. **Sign-in.** Run `enderis auth status`. If it is not connected, run
+   `enderis auth login` in the background, so you can read its output while
+   it waits. It prints a login code and opens the sign-in page in the user's
+   browser. Tell the user the code, and to choose the workspace for this
+   demo and approve. Wait for the command to finish, then check
+   `enderis auth status` again.
+3. **Enderis tools.** The later steps call Enderis tools such as
+   `get_service_schemas`. If you do not have them, connect `enderis mcp`,
+   which uses the sign-in from step 2, for this folder:
+   - **Claude:** write `.mcp.json` in the folder:
+     `{"mcpServers": {"enderis": {"command": "<full path to enderis>", "args": ["mcp"]}}}`.
+   - **Codex:** run `codex mcp add enderis -- <full path to enderis> mcp`.
+   - **Other assistants:** add a local MCP server that runs
+     `<full path to enderis> mcp`.
+
+   The tools appear only in a new session. Tell the user, in one message:
+   setup is done; start a new session in this same folder, paste the same
+   message again, and allow the Enderis tools if asked. Then stop.
+
 ### 1. Intake
 
-Accept text transcripts only (`.md`, `.txt`, `.vtt`, `.srt`). If the user has
-only audio, ask them to export a transcript from their call or meeting tool.
-Do not transcribe audio.
+The user's files may be anywhere in the folder. Move call transcripts to
+`discovery/transcripts/` and documents and notes to `discovery/docs/`. Tell
+the user what you moved.
+
+Accept text transcripts only (`.md`, `.txt`, `.vtt`, `.srt`, `.docx` or
+`.pdf` of a transcript). If the user has only audio or video, ask them to
+export a transcript from their call or meeting tool (Zoom, Teams, Google
+Meet, Gong and most others can). Do not transcribe audio.
 
 Write `discovery/sources.md` as a table: source id (`T1`, `D1`, `W1`), kind
 (transcript, document, web), title or file, date, and who was present or who
@@ -102,8 +152,9 @@ customer's own words and situations, not in tool names. Aim for 8 to 15
 scenarios: the main path, the hard cases the customer named, and one or two
 cases where the agent must refuse, escalate or ask.
 
-Show the brief to the user before you build. The assumed claims and open
-questions are what they take back to the customer.
+Show the brief to the user before you build, and wait for their
+corrections. The assumed claims and open questions are what they take back
+to the customer.
 
 ### 4. Systems map
 
@@ -209,21 +260,26 @@ Report to the user:
 - a table of scenarios: id, eval names, last verdict;
 - the **Assumed** claims and **Open questions** from the brief.
 
-Tell them they can try the demo agent by hand: `enderis chat --agent <name>`,
-or the agent's **Chats** tab in the web app. There, **Load eval** starts a chat
+Tell them they can try the demo agent by hand on the agent's **Chats** tab in
+the web app. There, **Load eval** starts a chat
 from one of the demo's evals, with **Evaluate**. Every web chat drafts the
 person's next message into the box, and **Autopilot** sends the drafts by
-itself. The web app works for a customer with no CLI.
+itself.
 
 Tell them how to show the demo to the customer:
 
 - **Now:** invite the customer's people to this workspace as outside
   collaborators (viewer or editor) from workspace settings.
 - **Later:** when the customer creates their own Enderis organization, they
-  invite the integrator to their workspace as an editor. The integrator signs
-  in with a separate context (`enderis auth login --context <customer>`),
-  picks that workspace, and runs `enderis import . --acceptance` from this
-  repository. The copy belongs to the customer.
+  invite the user to their workspace as an editor. The user then opens this
+  folder with you again and asks you to copy the demo there. Sign in with a
+  separate context (`enderis auth login --context <customer>`), have the user
+  pick the customer's workspace, and run `enderis import . --acceptance` from
+  this folder. The copy belongs to the customer.
+
+The rest of this section is for the engineers who build the real agent. Do
+not explain it to a salesperson; tell them to hand this folder to those
+engineers.
 
 When the customer's real agent exists, connect it with the
 `enderis-onboard` skill. Every eval belongs to one agent, so import the evals
