@@ -241,9 +241,8 @@ https://enderis.ai/docs/evals/assertions#record-metrics-without-gating.
 
 **Put every `assert` inside an `@assertion` function.** There, a failing `assert`
 fails that assertion. A bare `assert` directly in `check` stops the evaluator at
-that line and skips every later check. Validation (**Run draft** and **Import
-eval** in Create Eval, and the MCP tools `validate_eval` and `create_eval`)
-refuses an evaluator whose bare `assert` fails in its trial run on
+that line and skips every later check. Validation (the MCP tools
+`validate_eval` and `create_eval`) refuses an evaluator whose bare `assert` fails in its trial run on
 the untouched seed. Plain `enderis import` does not run the evaluator, so it does
 not catch this.
 
@@ -311,10 +310,10 @@ Three paths store an eval:
   directory; add `--acceptance` to put it in the acceptance set. Keep each
   file in the eval's own folder: a symbolic link that leads out of it fails
   the import. See https://enderis.ai/docs/cli/import.
-- **Dashboard, Create Eval** on the agent's page: a guided draft with **Run
-  draft** against the agent before it is saved. The **Edit** tab of an existing
-  eval saves a new version and, when it has a fixture, launches the scripted
-  self-test, which must pass.
+- **Dashboard**: **Create Eval** on the agent's page gives the user a prompt for
+  their coding agent, which then takes the MCP path below. The **Edit** tab of
+  an existing eval saves a new version and, when it has a fixture, launches the
+  scripted self-test, which must pass.
 - **MCP** from a coding agent: `get_authoring_packet`, `validate_eval` while
   drafting, then `create_eval` with `scripted_json` to launch the seed-0
   self-test; poll the returned `run_id` with `get_run` until it passes. To test

@@ -69,12 +69,10 @@ Do this yourself, every time, before anything else. Each check is quick when
 the step is already done.
 
 1. **CLI.** Run `enderis --version`. If it fails, install it:
-   `curl -fsSL https://enderis.ai/install.sh | sh`. If the installer stops
-   because `minisign` is missing, install minisign (`brew install minisign`
-   on a Mac with Homebrew, `sudo apt install minisign` on Debian or Ubuntu)
-   and run the installer again. The installer puts `enderis` in
-   `~/.local/bin`; if that is not on your `PATH`, call it by its full path.
-   The installer also installs the Enderis skills.
+   `curl -fsSL https://enderis.ai/install.sh | sh`. The installer puts
+   `enderis` in `~/.local/bin` and adds that folder to the user's shell
+   profile, which your current shell has not read: call it by its full path,
+   `~/.local/bin/enderis`. The installer also installs the Enderis skills.
 2. **Sign-in.** Run `enderis auth status`. If it is not connected, run
    `enderis auth login` in the background, so you can read its output while
    it waits. It prints a login code and opens the sign-in page in the user's
