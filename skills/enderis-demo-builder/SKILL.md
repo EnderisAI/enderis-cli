@@ -19,8 +19,9 @@ Enderis workspace with three parts:
 - a **playground** that models the customer's business and systems;
 - **evals**, one or more per scenario the customer described.
 
-The evals are the demo now and the acceptance tests later: when the real
-agent is built, the same evals grade it.
+The user first sees the agent working in a chat. The evals come next: they
+are the demo's proof now and the acceptance tests later, when the real agent
+is built.
 
 Work in the folder the user gave you and in a workspace of the
 integrator's own organization.
@@ -44,6 +45,7 @@ words:
 discovery/sources.md              # one row per source, with a source id
 discovery/transcripts/*.md        # text call transcripts
 discovery/docs/*                  # customer documents and notes
+research/*                        # saved web research
 brief.md                          # the cited brief, scenarios S1..Sn
 agents/<name>.md                  # the hosted demo agent
 services/<name>/behavior.py       # only for systems with no built-in service
@@ -53,7 +55,7 @@ evals/<eval>/                     # eval.md, playground.yaml, evaluator.py, scri
 standards/<name>.py               # optional checks every run is graded on
 ```
 
-`discovery/` and `brief.md` stay in this folder. `enderis import` reads
+`discovery/`, `research/` and `brief.md` stay in this folder. `enderis import` reads
 only `services/`, `personas/`, `playgrounds/`, `agents/` and `evals/`, plus the
 agent's `standards:` file. It reads each service, playground and eval only
 from its own folder, and fails one with a symbolic link that leads out of it.
@@ -62,6 +64,9 @@ agent's prompt, the evals, and the playground (for example a policy document
 seeded into `doc_library`).
 
 ## Steps
+
+The order gets the user to a working chat with the demo agent first. Web
+research runs in the background; tests and test runs wait for the user's yes.
 
 ### 0. Setup
 
@@ -75,9 +80,12 @@ the step is already done.
    `~/.local/bin/enderis`. The installer also installs the Enderis skills.
 2. **Sign-in.** Run `enderis auth status`. If it is not connected, run
    `enderis auth login` in the background, so you can read its output while
-   it waits. It prints a login code and opens the sign-in page in the user's
-   browser. Tell the user the code, and to choose the workspace for this
-   demo and approve. Wait for the command to finish, then check
+   it waits. It prints a login code and a link, and tries to open the link in
+   the user's browser. Always give the user both the link and the code: the
+   browser may not open. Tell them to type the code on that page, choose the
+   workspace for this demo and approve. The code works for 10 minutes. If the
+   command says the login expired, run it again and give the user the new
+   link and code. Wait for the command to finish, then check
    `enderis auth status` again.
 3. **Enderis tools.** The later steps call Enderis tools such as
    `get_service_schemas`. If you do not have them, connect `enderis mcp`,
@@ -107,16 +115,27 @@ Write `discovery/sources.md` as a table: source id (`T1`, `D1`, `W1`), kind
 (transcript, document, web), title or file, date, and who was present or who
 wrote it. Every later claim cites these ids.
 
-### 2. Research
+If the folder already has a brief, research, an agent or a practice world
+(from an earlier session or the user's own work), use them. Do not rebuild
+what is there; fill only what is missing.
+
+### 2. Research, in the background
 
 Research the customer on the public web: products, prices, policies, public
-process documents, the systems they use. Follow the source rules of the
-`enderis-playground-author` skill: every fact gets a URL and the date you
-checked it, and each web source gets a `W` id in `discovery/sources.md`.
+process documents, the systems they use. It improves the demo but must not
+delay the first chat. When you can start a background agent, give it this
+step now and go on to step 3. When you cannot, do this step after step 6.
+
+Follow the source rules of the `enderis-playground-author` skill: every fact
+gets a URL and the date you checked it, and each web source gets a `W` id in
+`discovery/sources.md`. Save what you find under `research/`. When it is
+done, add the facts to the brief, the agent's prompt and the practice world,
+import again (step 6), and tell the user in one or two lines what changed.
 
 ### 3. Brief
 
-Write `brief.md`. It replaces the PRD and is short: one or two pages.
+Write `brief.md` from the transcripts and documents. It replaces the PRD and
+is short: one page. Scenarios come later, in step 7.
 
 ```markdown
 # <Customer> — <agent name> brief
@@ -134,7 +153,7 @@ One paragraph: who the agent serves, on which channel, and what it does. [T1 12:
 - R1. One rule per line, with its source. [D1 §4.2]
 
 ## Scenarios
-- S1. <Situation in the customer's words>. Expected: <the outcome>. Covers R1, R3. Evals: s1_<name>. [T1 18:05]
+(Added in step 7.)
 
 ## Assumed
 - Claims with no source. Each one is a question for the customer.
@@ -145,14 +164,11 @@ One paragraph: who the agent serves, on which channel, and what it does. [T1 12:
 
 Cite every claim: a transcript timestamp, a document page or section, or a
 web id. A claim with no source goes under **Assumed**. Never move an
-assumption into **Rules** without a source. Write scenarios in the
-customer's own words and situations, not in tool names. Aim for 8 to 15
-scenarios: the main path, the hard cases the customer named, and one or two
-cases where the agent must refuse, escalate or ask.
+assumption into **Rules** without a source.
 
-Show the brief to the user before you build, and wait for their
-corrections. The assumed claims and open questions are what they take back
-to the customer.
+Show the user the job, the rules and the assumed claims in one short message,
+and keep building. Do not wait for their answer. Apply their corrections when
+they come, and import again.
 
 ### 4. Systems map
 
@@ -168,27 +184,27 @@ For each system in the brief, pick a service:
 2. Put customer documents and policies in the built-in `doc_library`.
 3. Write a custom service only when no built-in fits. Read section 8,
    "Authoring a mocked service", of the MCP resource
-   `enderis://docs/authoring-evals`. Give it only the operations the
-   scenarios need. Use the customer's own names for the system, its records
-   and its fields, so a real interface can replace the demo one later.
-   Write cases for each operation in `tests/tools/<name>.yaml` and run
-   `enderis tools test` before you build the playground.
+   `enderis://docs/authoring-evals`. Give it only the operations the agent's
+   main job needs; add more when a test needs them. Use the customer's own
+   names for the system, its records and its fields, so a real interface can
+   replace the demo one later. Write cases for each operation in
+   `tests/tools/<name>.yaml` and run `enderis tools test` before you build the
+   practice world.
 
 Write the chosen service in the brief's **Systems** table.
 
-### 5. Playground
+### 5. One practice world and the agent
 
-Follow the `enderis-playground-author` skill. Discovery transcripts and
-documents are sources, the same as web pages: cite them by source id. Records
-that no source supplies (customers, orders, cases) are simulated and must be
-labelled. Seed the records that the scenarios need among ordinary history
-and noise.
-
-### 6. Agent
+Build one playground, following the `enderis-playground-author` skill.
+Discovery transcripts and documents are sources, the same as web pages: cite
+them by source id. Records that no source supplies (customers, orders, cases)
+are simulated and must be labelled. For the first chat, seed what the
+agent's main job needs and a few ordinary records around it. Add more history
+and noise in step 7, when the tests need them.
 
 Write `agents/<name>.md`. The body is the system prompt; take it from the
-brief's job, actors and rules. Do not write the evals' answers into the
-prompt: the prompt states the rules, the evals test them.
+brief's job, actors and rules. Do not write test answers into the prompt: the
+prompt states the rules, the tests check them.
 
 ```markdown
 ---
@@ -201,7 +217,6 @@ vendor:
 interfaces:
   - {service: doc_library, interface: doc_library-canonical}
   - {service: <custom service>, interface: <custom service>-canonical}
-standards: ../standards/<name>.py
 ---
 You are the <job> assistant for <customer>. ...
 ```
@@ -210,30 +225,59 @@ You are the <job> assistant for <customer>. ...
 integrator needs no key of their own. Every service has a generated interface
 named `<service>-canonical`; use it unless the service ships another.
 
-### 7. Evals
-
-Follow the `enderis-eval-author` skill. Write at least one eval per scenario.
-Start each eval's name with its scenario id, for example `s3_late_pickup`, and
-list each scenario's eval names in the brief, so the brief and the evals trace
-in both directions. Every eval has a `scripted.json`, except a voice eval
-without a recorded call (see the eval-author skill). Use rules shared by every scenario as
-standards in `standards/<name>.py`, not as copies in each evaluator.
-
-### 8. Import, then run once
-
-Live runs are slow. Build and import everything first, so the whole demo is
-in the web app before any live run starts:
+### 6. Import, check, open the chat
 
 ```sh
 enderis import . --acceptance
 ```
 
-Fix every import error. Run each eval once with `--provider scripted`
-(`enderis run --agent <name> --eval <eval> --provider scripted`) to prove
-the evaluator.
+Fix every import error. Then send the agent one message the customer's own
+user would send, to check that it answers:
 
-Then give the user the workspace link and offer one live run of the
-acceptance set. Do not start it without their yes, and do not repeat it:
+```sh
+printf '%s\n' '<message>' | enderis chat --agent <name> --playground <playground> --idle-timeout 1m
+```
+
+Fix the agent or the practice world until the reply is sensible. The command
+prints `Run: <link>`. Make the chat link from it: keep the part before
+`/runs/`, then add `/agents/<agent id>?tab=chats&playground=<playground>`.
+Get the agent id from `list_agents`. Open the chat link in the user's
+browser (`open <link>` on a Mac, `xdg-open <link>` on Linux), and tell them:
+select **New chat**, and each reply is drafted for them; **Autopilot** sends
+the drafts by itself. If the agent page has no **Chats** tab, the workspace
+does not have chats turned on: tell the user to ask their Enderis contact.
+
+This is the first stop. Ask the user if they want tests next.
+
+### 7. Tests, when the user says yes
+
+Suggest 8 to 15 test topics as a numbered list, in the customer's own words
+and situations, not tool names: the main path, the hard cases the customer
+named, and one or two cases where the agent must refuse, escalate or ask.
+Cite each one. Let the user pick, drop or add topics, then add the chosen ones
+to the brief as scenarios:
+
+```markdown
+- S1. <Situation in the customer's words>. Expected: <the outcome>. Covers R1, R3. Evals: s1_<name>. [T1 18:05]
+```
+
+Follow the `enderis-eval-author` skill. Write at least one eval per scenario.
+Start each eval's name with its scenario id, for example `s3_late_pickup`, and
+list each scenario's eval names in the brief, so the brief and the evals trace
+in both directions. Every eval has a `scripted.json`, except a voice eval
+without a recorded call (see the eval-author skill). Use rules shared by every
+scenario as standards in `standards/<name>.py`, set with `standards:` in the
+agent's frontmatter, not as copies in each evaluator.
+
+Import again and fix every error. Run each eval once with `--provider
+scripted` (`enderis run --agent <name> --eval <eval> --provider scripted`) to
+prove the evaluator. Tell the user the tests are in the web app, and that
+**Load eval** on the **Chats** tab starts a chat from one of them.
+
+### 8. Live run, when the user says yes
+
+Offer one live run of the tests. Live runs are slow. Do not start it without
+their yes, and do not repeat it. It runs each test once:
 
 ```sh
 enderis test --agent <name>
@@ -252,17 +296,11 @@ Do not weaken an eval to make it pass.
 
 ### 9. Hand-off
 
-Report to the user:
+When the user stops, report:
 
-- the workspace link and the agent name;
-- a table of scenarios: id, eval names, last verdict;
+- the chat link and the agent name;
+- when there are tests, a table of scenarios: id, eval names, last verdict;
 - the **Assumed** claims and **Open questions** from the brief.
-
-Tell them they can try the demo agent by hand on the agent's **Chats** tab in
-the web app. There, **Load eval** starts a chat
-from one of the demo's evals, with **Evaluate**. Every web chat drafts the
-person's next message into the box, and **Autopilot** sends the drafts by
-itself.
 
 Tell them how to show the demo to the customer:
 
