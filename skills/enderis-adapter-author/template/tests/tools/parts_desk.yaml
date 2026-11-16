@@ -1,0 +1,23 @@
+services: [parts_desk]  # TODO: the service folder name
+seed:
+  services:
+    parts_desk:
+      parts:
+        - {id: HB-1042, name: Bilge pump impeller, stock: 3, bin: A4}
+cases:
+  - name: a part is found by its number
+    calls:
+      - tool: parts_desk.get_part
+        args: {part_id: HB-1042}
+        expect: {result: {name: Bilge pump impeller, stock: 3}}
+  - name: reserving lowers stock and logs the reservation
+    calls:
+      - tool: parts_desk.reserve_part
+        args: {part_id: HB-1042, quantity: 2, for_person: Dana Whitlock}
+      - tool: parts_desk.reserve_part
+        args: {part_id: HB-1042, quantity: 5, for_person: Dana Whitlock}
+        expect: {error: only 1 of HB-1042 in stock}
+    state:
+      parts_desk:
+        parts: [{id: HB-1042, stock: 1}]
+        reservations: [{part_id: HB-1042, quantity: 2}]

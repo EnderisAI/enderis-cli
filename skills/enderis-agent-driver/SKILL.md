@@ -24,6 +24,19 @@ config, scripts or prompts. You may start it with your own compose file or
 environment overrides. If the agent cannot be reached without a change, stop
 and report the gap.
 
+**When onboarding already wrote a standard driver** (`driver_written` in its
+JSON, for an AI SDK chat route in Next.js, a LangGraph server, Google ADK or
+Mastra), do not write another. Run one eval with it first (section 3). Edit
+`.enderis/driver/driver.py` only if the run shows that the app's input
+differs, for example a graph whose input is not `messages`, a route that
+reads other fields, or a different graph or Mastra agent than the one the
+driver uses (`GRAPH` or `AGENT` in driver.py). Then run
+`enderis driver check` and `enderis onboard` again. Build output and local
+databases the app writes during runs (`.next/`, `.mastra/`, a SQLite file)
+are fine, even when git ignores them: each run starts the app in its own
+copy of the repository, so do not add symlinks, copies or launchers to move
+them.
+
 A driver is for a front door onboarding cannot drive. If the front door works
 but onboarding missed some of the agent's MCP clients, do not write a driver:
 declare those boundaries as the `enderis-onboard` skill describes ("Declare a
@@ -39,10 +52,18 @@ Answer these before writing code. Write the answers into the body of
 2. **Front door.** Is there an entry point real users reach (a webhook, a chat
    API)? Or only a test harness (a simulator, an events API)? Prefer the real
    one. Set `front_door: production` or `harness` honestly; the run page shows it.
-3. **Start.** How does the app start without edits? Find the existing compose
-   file, script or command and the environment it reads. Either you start the
-   app yourself before the run (`app: attached`), or the driver's `start` and
-   `stop` hooks start and stop one copy of it per run slot (`app: managed`).
+3. **Start.** How does the app start without edits? Find the existing script
+   or command and the environment it reads. Use `app: launched` when you can:
+   Enderis starts the app for each run with the run's mocked services and
+   switched-off services (section 2, "A launched app"). It is required when
+   the app calls any outside service, because only an app Enderis starts gets
+   the mocks. Use `app: attached` (you start the app before the run) or
+   `app: managed` (the driver's `start` and `stop` hooks start one copy per run
+   slot) only for an app that calls no outside service, or one Enderis cannot
+   launch yet (an app that is not Node or Python). If the
+   repository has no front door at all, only an agent object other code
+   imports, use `app: harness` (section "A harness"). Never write a harness
+   when a front door exists.
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
@@ -58,22 +79,29 @@ Answer these before writing code. Write the answers into the body of
 6. **Outcomes.** Besides messages, what can the agent do that an eval must see?
    A hand-off to a human is an escalation, which the driver reports. An eval
    sees only channel messages (replies and the simulated people's messages),
-   channel records and escalations. The app's own API calls are not mocked and
-   not seen, so an eval cannot grade them.
+   channel records and escalations, and, for a launched app or a harness, the
+   records its mocked boundaries change and its MCP calls (the driver does not
+   report them). An attached or managed app's own API calls are
+   not mocked and not seen, so an eval cannot grade them.
 7. **Knowledge.** Where does the agent's knowledge and data live (files,
    database, an API)? The app keeps using it during runs. It decides which evals
    make sense: ones whose answer shows in what the agent says.
 
 ## 2. Write the driver
 
-Copy `template/` to `.enderis/driver/` at the agent repository root (or in
-the agent's package, for a monorepo). Use another directory only if the owner
-asks; then pass `--driver <dir>` to `enderis onboard`. Then:
+Copy `template/http/` (`driver.md` and `driver.py`) to `.enderis/driver/` at
+the agent repository root (or in the agent's package, for a monorepo). It is
+the template onboarding names as `driver_template: http`, for an agent with an
+HTTP front door, such as a framework's own dev server (`reach: server`, with
+the command in `launch`). For a harness, copy a harness template instead
+(section "A harness"). Use another
+directory only if the owner asks; then pass `--driver <dir>` to
+`enderis onboard`. Then:
 
 - `driver.md`: set `name`, `description` (for people), `command` (it runs in
   the driver directory), the `settings` it reads (environment variable names
-  such as the app URL, never model keys or `PYTHONPATH`), and `files` (every
-  file the driver needs). Keep `app: attached` and `isolation: exclusive`;
+  file the driver needs). Set `app: launched` (section "A launched app") or
+  `app: attached` as triage item 3 says, and keep `isolation: exclusive`;
   change to `namespace` only when triage item 5 allows it.
 - For `app: managed`, add `start` and `stop` (lists that run in the driver
   directory; list their scripts in `files`). `start` exits 0 only when the copy
@@ -103,12 +131,150 @@ The CLI provides `enderis.driver` to the driver when it starts it. You do not
 install anything. `print` and the output of programs the driver starts go to
 stderr; use `ctx.log` for the stop log.
 
+### A launched app
+
+Set `app: launched` and these fields in `driver.md`; remove `start` and
+`stop`:
+
+```markdown
+app: launched
+isolation: exclusive
+runtime: node                      # or python: the app's language
+launch:
+  process: [npm, run, dev]         # the command a developer runs, no shell
+port_env: PORT                     # or a "{port}" argument in launch instead
+ready: /api/health                 # GET path that answers 2xx when ready
+app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
+```
+
+- `launch`: the start command from the README, `package.json` scripts or the
+  Procfile, as a list. It runs in the folder you onboard. It must start a Node
+  or Python process that serves the front door. For an app that runs with
+  Docker Compose, see "A Docker Compose app" below.
+- Port: find where the app reads its port. If it reads a variable, set
+  `port_env` to it. If the port is a command-line flag, put `"{port}"` (quoted)
+  in that argument, for example `[uvicorn, app:app, --port, "{port}"]`. Never
+  both. If the app opens another port, Enderis finds it.
+- `ready`: a path that answers a plain GET with 2xx once the app takes
+  messages (a health route, or `/` when the app serves a page there). Not a
+  path behind a sign-in. Enderis does not follow redirects.
+- `app_env`: only settings the app needs that are not secret. Never list a
+  model key, a boundary gate or a secret: model keys reach the app from
+  onboarding, and gate variables are set by Enderis.
+- The driver reads the app's address from `ENDERIS_APP_URL`. Do not list it
+  in `settings`, and never list a model key or the gate variable of a mocked
+  or switched-off service there: onboarding refuses it.
+- Start the driver with plain `python3` or `node` in `command`. A driver that
+  skips `PYTHONPATH` (`python3 -I` or `-S`) cannot load the network guard, and
+  the run stops before the first message. The driver runs from the run's copy
+  of the repository.
+- The app and the driver get an empty `HOME` of the run's own, not yours, so
+  nothing in your home folder (a CLI login, its plugins or settings) reaches
+  the run. `app_env` cannot name `HOME`.
+
+Enderis starts the app with undeclared destinations denied. If the app needs
+a host other than its boundaries and its model provider's default host, add
+it under `allow:` in `.enderis/boundaries.md` (the `enderis-onboard` skill).
+
+### A Docker Compose app
+
+When developers start the app with Docker Compose, launch the compose project:
+
+```markdown
+app: launched
+isolation: exclusive
+runtime: node                      # the language of the front door service
+launch:
+  compose: {files: [compose.yaml], service: web, port: 3000}
+ready: /healthz
+```
+
+- `files`: the compose files a developer passes with `-f`, relative to the
+  folder you onboard. `service`: the service that serves the front door.
+  `port`: its port inside the container (the right side of its `ports:`
+  entry). A compose launch takes no `port_env`.
+- Each run is its own compose project, `enderis-<run id>`, in its own copy of
+  the repository. If runs cannot get a copy, Enderis does not start the run.
+  Enderis starts the services with no profile plus the front door's profiles.
+  It publishes only the front door's port, on a free loopback port, and
+  removes every other published port. No service restarts. Database and cache
+  services start empty for the run. After the run, Enderis removes the
+  containers, networks, volumes and the images the run built. If the command
+  is killed, the next `enderis run` of the agent removes them.
+- The front door service and every service built from the repository get the
+  network guard, the mocks and the model keys. Their containers must run Node
+  18.19 or later, or Python. If the guard does not load in one of them (for
+  example, an entrypoint that clears the environment, such as `env -i`), the
+  run stops before the first message.
+- Every other service (a prebuilt image) gets no guard, no model key, and
+  every mocked or switched-off gate empty. Under the deny policy it joins only
+  a network with no route out, and the run prints its name. A prebuilt service
+  that shares another network (`network_mode`) is refused under deny.
+- A switched-off service's gate is absent in the guarded services, even when
+  the compose file, an `env_file` or the image sets it. A shell entrypoint that
+  runs before Node or Python sees it as empty.
+- Secrets reach the guarded containers only through `${NAME}` references in
+  the override Enderis writes. Enderis never writes them to a file.
+- Enderis refuses, and names, what would share or reach state outside the
+  run: `container_name`; a volume or network with a fixed `name` or
+  `external: true`; a bind mount, build context, extra build context,
+  Dockerfile, `env_file` or secret file outside the repository; a remote build
+  context; a volume driver with a host path; `network_mode: host` or
+  `container:…`; `volumes_from: container:…`; `pid`, `ipc` or `userns_mode:
+  host`; `privileged`; `devices`; `cap_add`; `build.ssh`; `build.network:
+  host`. Do not edit the customer's compose files. Write a compose file for
+  runs in `.enderis/` without these and list it in `files`. Paths in a compose
+  file are relative to the folder of the first file.
+- The machine that runs the evals needs Docker with Compose 2.24 or later,
+  with the engine on that machine (on Linux, not Docker Desktop's VM or a
+  remote engine).
+
+### A harness
+
+For a repository with no front door: the driver imports the agent object and
+calls it, in its own process, with the agent's real code, prompt, tools and
+model. Copy `template/python-harness/` or `template/node-harness/` (the names
+onboarding prints as `driver_template`) to `.enderis/driver/`, then fill in
+`load_agent` and `ask`. `harness-frameworks.md` shows `ask` for LangGraph,
+LangChain, Deep Agents, the OpenAI Agents SDK, CrewAI, LlamaIndex, Strands,
+the Claude Agent SDK, pydantic-ai, the Vercel AI SDK, LangGraph.js and plain
+loops.
+
+```markdown
+front_door: harness
+app: harness
+isolation: exclusive
+runtime: python                    # or node
+command: [python3, driver.py]      # node: [node, driver.mjs]
+app_env: [SITE_NAME]               # non-secret settings the agent needs
+```
+
+- Enderis starts the driver in the folder you onboard, with the run's mocked
+  services, switched-off services, model keys and `app_env` already in place,
+  before the driver imports anything. One process serves one run, so the same
+  agent object answers every wake; keep the conversation in `ctx.state`.
+- The command must start `python` or `node` with the agent's dependencies:
+  for example `[uv, run, python, driver.py]`. Nothing is installed at run time.
+- The helper (`enderis.driver`, or `@enderis/driver` in Node) must be the
+  driver's first import. It moves the protocol off stdout and stdin, so what
+  the agent, a native library or a child process prints goes to the log.
+- Load the agent in `start`, not at import, so `enderis driver check` works.
+- The harness gets an empty `HOME` of the run's own, as a launched app does.
+- `settings`, `app_env` and model keys share the one process: a name in two of
+  them is refused. Never list a model key or a boundary gate.
+- Claude Agent SDK: its `claude` CLI is a native program the in-process guard
+  does not reach. Its model traffic goes through the run's proxy
+  (`HTTPS_PROXY`), which allows only the model host and declared hosts. MCP
+  servers given in `mcp_servers` are not mocked yet: switch them off under
+  `off:` or keep the agent's tools in-process (SDK MCP tools, which the guard
+  covers).
+
 ## 3. Check, onboard, run
 
 ```sh
 enderis driver check .enderis/driver           # manifest, hash, describe; runs local code
 enderis onboard <agent-path> --name <agent-name> # finds .enderis/driver/ and says so
-# start the app as in driver.md, then
+# for app: attached, start the app as in driver.md; a launched app starts with each run
 enderis run <agent-path> --list
 enderis run <agent-path> --eval <name>
 ```

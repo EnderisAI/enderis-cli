@@ -21,6 +21,30 @@ https://enderis.ai/docs/evals/writing-evals, `/docs/evals/assertions`,
 `/docs/evals/authoring`. Over MCP, the full authoring guide is the resource
 `enderis://docs/authoring-evals`; open it only when a rule here is not enough.
 
+## Interview first
+
+Before you write, settle five questions. Ask them in one message, each with
+the answer you propose, taken from the agent's prompt, the playground and any
+brief in the folder:
+
+1. **Which agent and playground?** Propose the agent and the playground in
+   this folder, or the ones just built.
+2. **What happens, in the user's own words?** Propose the agent's main job,
+   or the next scenario in the brief.
+3. **What is the right outcome?** Propose the end state the agent's rules
+   lead to: the record, message or booking that must exist.
+4. **What must the agent never do?** Propose the rule the scenario tempts it
+   to break: act before it asks, act for the wrong person, promise what a
+   source does not support.
+5. **Who starts it, and on which channel?** Propose the person the agent
+   serves, on the agent's main channel.
+
+"You pick" accepts every proposed answer. When the request says to take the
+defaults, do not wait: state your proposed answers in one message and write
+the eval. Every eval gets a `scripted.json` (except a voice eval with no
+recorded call) and goes in the acceptance set unless the user says
+otherwise.
+
 ## eval.md
 
 ```markdown
@@ -57,7 +81,13 @@ narration. Format: https://enderis.ai/docs/evals/writing-evals.
 
 **Mark key records.** List in `key_records:` each seed record the deciding rule
 depends on that no check names, such as a consent row. Name a row some tool
-returns whole. Display-only; see https://enderis.ai/docs/evals/writing-evals.
+returns whole. Display-only; an `id` not in the seed is dropped. See
+https://enderis.ai/docs/evals/writing-evals.
+
+**Keep the eval's text in step with its data.** When a re-import changes a fact
+in the starting data, the response lists any trigger, description or persona
+text that still says the old value, and text-check rewrites for the data's own
+text. An imported file is never rewritten for you: fix the lines in your files.
 
 **The trigger is a natural opener.** It is delivered verbatim. A real person
 states a problem in their own words and does not recite ids, emails or exact
@@ -204,10 +234,14 @@ a hand-off to a human there.
 
 **Hand the judge the right text.** `run.transcript` for anything about the
 conversation (asked first, waited, refused). `run.final_answer` only for the last
-reply on its own. For an email the agent wrote, read its text from `db`. Pass
+reply on its own. A fact the agent must tell the person (a time, a price) is
+checked in `run.transcript`, deterministic checks included: with a simulated
+person the last reply is often only "You're welcome". For an email the agent wrote, read its text from `db`. Pass
 extra material a rubric needs, such as tool calls, as `evidence=`, never glued
 onto the transcript. Keep times, recipients and counts in deterministic checks;
-use the judge only for meaning. One evaluation gets at most 100 judge calls of
+use the judge only for meaning. Write the facts the right answer depends on
+into the rubric ("standard check-in is 4:00 PM"): the judge sees only what you
+pass, and calls a correct fact it cannot check unsupported. One evaluation gets at most 100 judge calls of
 at most 1 MiB of text each.
 
 **Soft-collect by default.** A failed check records and the evaluator keeps
@@ -296,6 +330,10 @@ https://enderis.ai/docs/evals/writing-evals#voice-evals (MCP: the resource
 - **Do not make the scenario depend on an id the caller must say aloud** (an
   email, an order number). Speech recognition mangles it. Seed it where the agent
   can read it.
+- **An agent that places calls gets `call: outbound`.** The trigger's `from`
+  is the person who picks up, and its text is the dialer's note to the agent
+  (the account, the number), not the persona's words. The agent is not told who
+  answered. Grade checks the agent must make before it dials in a text eval.
 - **`scripted.json` needs a `call`.** A scripted voice run replays a call
   timeline recorded from one live run of the eval, so the fixture carries that
   `call` next to `turns` and `judge`. Without a recording from a live run, leave
@@ -328,6 +366,7 @@ Three paths store an eval:
 ```sh
 enderis run . --list                          # from the onboarded agent's repo
 enderis run . --eval book_with_right_alice    # add --reps 5 for repeats
+enderis run --agent <hosted agent> --eval book_with_right_alice --provider scripted   # a hosted agent's self-test
 ```
 
 Open the printed run link and read **Assertions** first: one row per assertion,
