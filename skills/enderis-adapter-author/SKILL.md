@@ -2,9 +2,11 @@
 name: enderis-adapter-author
 description: >-
   Build an Enderis adapter for an API the agent calls that no built-in adapter
-  covers, an MCP server or a REST API: read its real tools or routes, write a
-  small service and an interface under .enderis/services/ from the template,
-  test it, import it and connect the boundary. Use when
+  covers, an MCP server or a REST API: read its real tools or routes, write an
+  interface over a built-in service that already models the API (such as
+  Gmail or Google Calendar over REST), or else a small service and an
+  interface under .enderis/services/ from the template; test it, import it
+  and connect the boundary. Use when
   `enderis connections list` shows no adapter that fits a boundary, or when
   asked to mock a private or custom MCP server or REST API for Enderis runs.
 ---
@@ -34,6 +36,90 @@ that imports as it is: a parts desk service with two operations, an MCP
 interface (`interfaces/mcp.py`) with two tools, a REST interface
 (`interfaces/rest.py`) with one route, and a tool test file. Start from it,
 and keep the interface you need.
+
+## An interface over a built-in service
+
+First run `enderis tools schemas`. When a built-in service there already
+models the API (for example `google_workspace` for Gmail and Google
+Calendar), do not write a service. Write only the interface, in a folder
+named for the built-in, with no `behavior.py`:
+
+```text
+.enderis/services/google_workspace/interfaces/gmail_rest.py
+.enderis/services/google_workspace/interfaces/calendar_rest.py
+```
+
+- `service=` is the built-in's name, and `name=` is `<builtin>-<short>`. Do
+  not use a name the built-in already has; import refuses it.
+- For a REST client, `protocol="http"` and `upstream["endpoint"]` is the
+  origin the client calls. Write one file per origin.
+- Take op names and their inputs from `enderis tools schemas <builtin> --json`.
+  Each `canonical` must name one of those ops.
+- Each file must import on its own: do not import a sibling file.
+
+```python
+# gmail_rest.py
+from enderis.interface import http_response, interface, tool
+
+@interface(service="google_workspace", name="google_workspace-gmail_rest", protocol="http",
+           upstream={"name": "Gmail API v1", "url": "https://developers.google.com/gmail/api",
+                     "endpoint": "https://gmail.googleapis.com"},
+           http_auth=["Authorization"])
+class GmailRest:
+    @tool(name="list_messages", canonical="google_workspace.search_emails",
+          classification="read", route=("GET", "/gmail/v1/users/{userId}/messages"),
+          schema={"parameters": {"type": "object", "properties": {
+              "userId": {"type": "string"}, "q": {"type": "string"}}}})
+    def list_messages(self, call):
+        got = call.invoke("google_workspace.search_emails", {"query": call.args.get("q", "")})
+        if not got:
+            return http_response(400, {"error": {"code": 400, "message": got.error.message}})
+        found = got.result["messages"]
+        return {"messages": [{"id": m["id"], "threadId": m["threadId"]} for m in found],
+                "resultSizeEstimate": len(found)}
+```
+
+```python
+# calendar_rest.py
+from enderis.interface import http_response, interface, tool
+
+@interface(service="google_workspace", name="google_workspace-calendar_rest", protocol="http",
+           upstream={"name": "Google Calendar API v3",
+                     "url": "https://developers.google.com/calendar/api",
+                     "endpoint": "https://www.googleapis.com"},
+           http_auth=["Authorization"])
+class CalendarRest:
+    @tool(name="list_events", canonical="google_workspace.list_events",
+          classification="read", route=("GET", "/calendar/v3/calendars/{calendarId}/events"),
+          schema={"parameters": {"type": "object", "properties": {
+              "calendarId": {"type": "string"}, "timeMin": {"type": "string"},
+              "timeMax": {"type": "string"}}}})
+    def list_events(self, call):
+        args = {k: call.args[k] for k in ("calendarId", "timeMin", "timeMax") if k in call.args}
+        got = call.invoke("google_workspace.list_events", args)
+        if not got:
+            return http_response(404, {"error": {"code": 404, "message": got.error.message}})
+        return {"items": got.result["events"]}
+```
+
+Skip the service steps and `enderis tools test` (it checks a `behavior.py`,
+and there is none). Import the folder, then onboard again:
+
+```sh
+enderis import .enderis/services/google_workspace
+enderis onboard . --json
+```
+
+Import prints the interfaces it stored over the built-in. Onboarding gives
+each REST boundary the interface whose `upstream["endpoint"]` has the
+boundary's origin. If more than one interface has that origin, onboarding
+asks for `interface:` in the boundary's declaration: name yours there. This
+works for repository-agent runs (`enderis run`, `enderis serve`).
+
+Google clients: a recent `google-api-python-client` uses the discovery
+documents bundled with it, so it reads nothing from the network to build a
+client. Its token refresh goes to `oauth2.googleapis.com`, which a run does
+not mock, so give the run a static test token with a far-future expiry.
 
 ## 1. Read the real surface
 
@@ -99,7 +185,9 @@ Then change the parts marked TODO:
 
 - **Service name:** lower case with underscores, named for the product (for
   example `harbor_inventory`). It must not be a built-in service name; run
-  `enderis tools schemas` to list those. The folder name is the same.
+  `enderis tools schemas` to list those. If a built-in already models the
+  API, write only an interface over it ("An interface over a built-in
+  service"). The folder name is the same.
 - **Collections:** the records the tools read and change, in `state=`, with a
   row schema for each in `seed_authoring`. The playground seeds them.
 - **Operations:** one `@op` per thing the tools do (look up, list, create,
@@ -218,8 +306,10 @@ enderis import .enderis/services/<service>
 ```
 
 Import prints `services: 1 created, 0 unchanged, 0 failed` (or `1 unchanged`).
-An error names the file and the problem; fix it and import again. A built-in
-name is refused: rename the service.
+An error names the file and the problem; fix it and import again. A
+`behavior.py` with a built-in name is refused: rename the service, or delete
+`behavior.py` and keep only an interface over the built-in ("An interface
+over a built-in service").
 
 - **An MCP boundary:**
 

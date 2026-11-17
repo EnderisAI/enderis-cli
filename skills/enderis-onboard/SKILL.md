@@ -100,9 +100,15 @@ enderis onboard . --json
 ```
 
 Read `execution_status`, `name` (the agent's name), `boundaries` (each has an
-`id`, a `protocol`, `constructed_at` and `gates`), `prompt_urls`,
-`unresolved_clients`, `declaration_errors`, `cannot_mock`, `switched_off`,
-`agent` and `next_actions`.
+`id`, a `protocol`, a `basis`, `constructed_at` and `gates`), `model_keys`,
+`prompt_urls`, `unresolved_clients`, `declaration_errors`, `cannot_mock`,
+`switched_off`, `corrections`, `agent` and `next_actions`.
+
+Onboarding reads the code and guesses. When a guess is wrong (a boundary
+that is not one, a wrong transport or URL, the wrong model key, the wrong
+package), correct it in `.enderis/boundaries.md` ("Correct a wrong guess"
+below). Never stop because of a wrong guess, and never attach an unrelated
+adapter to a boundary that is not real.
 
 `agent` is there when onboarding recognizes the framework. It names the
 `framework` it recognized, the `agent_object`, the `prompt` and the `tools`
@@ -117,7 +123,7 @@ Model key names come from source evidence. Native Node `fetch` calls to the lite
 | Result | Action |
 | --- | --- |
 | `execution_status: ready` | Go on below. |
-| Several packages found | Run again with the `--target` the CLI shows. Default: the package that holds the agent's prompt. |
+| Several packages found, or the wrong one chosen | Write `target: <id>` in `.enderis/boundaries.md` and run again ("Correct a wrong guess"). Default: the package that holds the agent's prompt. |
 | `driver_written` in the JSON | Onboarding found an AI SDK chat route, a LangGraph server, Google ADK or Mastra, wrote a standard driver in `.enderis/driver/` and onboarded with it. Go on below with it unchanged. Edit it only when a run shows that the app's input differs (for example a graph whose input is not `messages`); `driver.md` says which graph or app it uses; the Mastra driver uses the first agent `GET /api/agents` lists. If the error names a written driver folder, delete that folder to onboard without it. |
 | `needs_ingress` or `needs_worker` | The agent needs a driver. See "Driver agents" below. When the JSON has `agent`, write the driver to reach the agent the way `agent.reach` and `agent.launch` say. |
 | Exit 2: `no agent target found (no_agent_target)` | If the folder holds an app that answers messages (a web server, a simulator, a queue worker), it needs a driver: see "Driver agents" below. If it holds no agent at all, take the default at once: build a demo agent with the `enderis-demo-builder` skill, and say so. |
@@ -125,6 +131,7 @@ Model key names come from source evidence. Native Node `fetch` calls to the lite
 | Exit 2: no boundaries found | Read the code. Declare each REST API or MCP server it calls ("Declare a boundary onboarding missed", "REST boundaries"), and list each service Enderis cannot mock under `off:` ("Switch a service off"). Pass `--no-boundaries` only when it calls none. |
 | The code passes a server map to a client (langchain `MultiServerMCPClient`, or a `servers` map) | Onboarding reads a map written inline (`MultiServerMCPClient({...})`): each key is a boundary. A map built elsewhere and passed as a variable or call is listed in `unresolved_clients`: declare one boundary per map key ("Declare a boundary onboarding missed"). |
 | `unresolved_clients` or `declaration_errors` not empty | Fix them ("Declare a boundary onboarding missed"), then onboard again. |
+| A boundary that the code does not call (for example a key inside a server's settings read as a server), or no adapter fits it because it is not real | List it under `not_boundaries:` ("Correct a wrong guess") and onboard again. |
 
 Then check the code before step 3. Onboard again after any
 change to `.enderis/boundaries.md` or `.enderis/launch.md`; unchanged metadata deduplicates.
@@ -152,10 +159,12 @@ a normal setting. Driver settings remain in `driver.md`.
    `fetch(`, `axios`, `got`, `httpx`, `requests`, `aiohttp`, GraphQL clients,
    and other vendor SDKs such as Octokit, jsforce or `openai`-style API
    clients (not the agent's own model client). Each one reaches production in
-   a chat unless it gets an adapter. For each, build a REST adapter and
-   declare the boundary as `transport: http` ("REST boundaries" below). For a
-   service the person will use only as a live read (step 3, item 3), declare it
-   without `interface:` and do not build an adapter.
+   a chat unless it gets an adapter. Every REST client of a system of record
+   (CRM, tickets, mail, calendar, sheets, payments) gets an adapter, even when
+   its keys are placeholders: build it and declare the boundary as
+   `transport: http` ("REST boundaries" below). Only an information source
+   (step 3, item 3) may be a live read: declare it without `interface:` and do
+   not build an adapter.
 
 #### Driver agents
 
@@ -248,8 +257,10 @@ For each boundary that still needs a choice:
    ```
 
    A REST boundary declared without `interface:` shows `no_mock` in
-   `boundaries`. It can only be a live read (or own host): it cannot be
-   mocked, and a run that leaves it mocked is refused with `needs_adapter`.
+   `boundaries`. It cannot be mocked until it has an interface, and a run that
+   leaves it mocked is refused with `needs_adapter`. The no-mock line names
+   what to do (an interface over a built-in service, or an adapter): do it
+   without asking.
 
    Do this only when Enderis starts the app (behind its HTTP front door, or
    through a launched or harness driver; not an attached or managed app), and
@@ -304,8 +315,8 @@ one line which state you took for each service:
    building the adapter when there is none (`enderis-adapter-author`).
 4. **Otherwise:** switch it off.
 
-To switch a service off, remove its declare block and list it under `off:` in
-`.enderis/boundaries.md`:
+To switch a service off, list it under `off:` in `.enderis/boundaries.md`,
+named after its boundary id, and remove its declare block if it has one:
 
 ```markdown
 ---
@@ -361,8 +372,9 @@ playground, skip its interview and audit steps and take these defaults:
   the person's "About the agent" line when they gave one.
 - **Services:** the service behind each connection from step 3. For a driver
   agent, the channel service its driver uses (for example `whatsapp`), with
-  the people who write to the agent. Read the row schemas before you write a
-  row:
+  the people who write to the agent. For an interface over a built-in
+  service, seed that built-in service (for example `google_workspace`). Read
+  the row schemas before you write a row:
 
   ```sh
   enderis tools schemas <service> [<service>...] --json
@@ -379,6 +391,9 @@ Import it and fix every error until the import is clean:
 ```sh
 enderis import .enderis/playgrounds/<agent name>-first
 ```
+
+Then run the health check ("Health check" below) and fix what it reports
+before you start the chat.
 
 ### 5. Start the chat and open it
 
@@ -404,10 +419,10 @@ go on. Do not try other browsers. Tell them they can type in the chat.
 
 | In `.enderis/chat.log` | Action |
 | --- | --- |
-| `needs_adapter: <boundary>` | That boundary has no connection. Go back to step 3. When the hint says it has no mock, run the `enderis connections set … --read-only` command it gives. |
+| `needs_adapter: <boundary>` | That boundary has no connection. Go back to step 3. When the hint says it has no mock, do what it names. Never default to a live read. |
 | `This package changed since … was onboarded` | Run `enderis onboard . --json` again, then start the chat again. |
 | A required model key is missing | Check the environment for the variable. If it is set, pass it to the agent (for an attached app, through the override in "Driver agents") and start the chat again. If not, tell the person the variable name and wait until they set it. |
-| `Not reached: <boundary>` | The agent did not connect to that boundary. That is fine when the messages did not need it. If they did, a gate variable is usually missing: see "Declare gate variables", onboard again, start the chat again. |
+| `Not reached: <boundary>` | The agent did not connect to that boundary. That is fine when the messages did not need it. If they did, a gate variable is usually missing: see "Declare gate variables", onboard again, start the chat again. If the code never connects to it, it is not a boundary: list it under `not_boundaries:`. |
 | No `chat: ` line, and the chat ended | Run `enderis update`, then start the chat again. |
 
 ### 6. Behind the chat: playground, evals, one live run
@@ -454,6 +469,73 @@ Do this while the person chats. Do not ask for a yes.
    `enderis-eval-author` skill). If the eval was at fault, fix it, import it
    and run it once more. Do not weaken an eval to make it pass.
 
+## Health check
+
+After every change to `.enderis/`, the connections or the playground, run:
+
+```sh
+enderis chat --check --json
+```
+
+It starts the agent once on its mocks, sends one short message through its
+front door and prints one result. Run it again after each fix until `ok` is
+`true`. A `null` never makes `ok` false: when every other entry is `true`, go
+on to the chat. For each entry in `checks` with `ok: false`, do what its
+`next` says:
+
+| `check` | Fix |
+| --- | --- |
+| `agent_started` | Read `detail`. `needs_adapter`: step 3. No playground: step 4. Otherwise run with `--debug` to see the agent's own output. |
+| `front_door` | The agent started but did not answer. Run with `--debug`; fix the driver or `.enderis/launch.md`, never the agent. |
+| `front_door` (`ok: null`) | The agent finished without a text reply. Some agents answer only a task. Go on to the chat and do its `next` there: send a task that needs a reply. Fix the driver only if that also shows no reply. |
+| `model_key` | Export the key the agent reads. If onboarding named the wrong key, declare `model_keys:`. |
+| `boundary` | "no adapter is assigned": assign one (step 3), or switch the service off. If the code does not call it at all, add the `correction` line (`not_boundaries: [<id>]`) instead. |
+| `connection` | The agent called a host that is no boundary. Declare it as a boundary (`transport: http`) or, for a model, install or telemetry host, list it under `allow:`. |
+| `unseen_connection` (`ok: null`) | The agent opened a connection around Enderis (a raw socket or native client), so it was not mocked. Tell the user it may reach production; Enderis cannot simulate it. |
+| `interaction` (`ok: null`) | The agent asked for approval; the check rejected it. Nothing to fix; an eval tests that action. |
+
+`ok: null` means this run cannot tell. "inferred but never seen" is `null`:
+the short message may not need that service. Read the code at its
+`constructed_at`; add the `correction` only when the code never connects to
+it, or declare its gate variables when a gate keeps it off. Otherwise change
+nothing.
+
+## Correct a wrong guess
+
+Every guess onboarding makes can be overruled with one line in
+`.enderis/boundaries.md`. Onboarding checks each line, lists the ones that
+count in `corrections` (with what it `inferred`), and lists the ones that fail
+in `declaration_errors`:
+
+```yaml
+---
+target: python:agent                 # the package to onboard
+not_boundaries: [headers]            # inferred boundaries the code does not call
+model_keys: [OPENAI_API_KEY]         # the model keys the agent reads
+boundaries:
+  slack:                             # an inferred boundary with the wrong transport or URL
+    declare: {transport: streamable_http, constructed_at: agent/mcp.py:40, url: https://mcp.slack.com/mcp}
+---
+```
+
+- `target`: an id `enderis inspect` lists. `--target` wins over it. It
+  cannot choose a package inspection missed: write a driver in that
+  package's `.enderis/driver/` (enderis-agent-driver), remove `target:`, and
+  run `enderis onboard <package directory>`.
+- `not_boundaries`: only boundaries with `basis: observed`. Read the code at
+  `constructed_at` first: drop a boundary only when the code never connects
+  to it.
+- `model_keys`: replaces the inferred list. Only model key names Enderis
+  passes are allowed (the error lists them).
+- A `declare` block under an inferred boundary's id replaces it, after the
+  checks in "Declare a boundary onboarding missed". Its gates are kept.
+- An `off:` entry named after an inferred boundary switches that service off
+  ("Switch a service off").
+- `target:` is read only from `.enderis/boundaries.md` in the path you
+  onboard.
+
+Onboard again after each change, then run the health check.
+
 ## Name the blocker
 
 When the real agent cannot run at all (no front door a driver can use, the
@@ -473,18 +555,23 @@ Do not draft evals for an agent that cannot run.
 
 A REST, GraphQL or SDK client gets its adapter in this order:
 
-1. **Build the adapter** with the `enderis-adapter-author` skill: a service
+1. **Write an interface over a built-in service** when one models the API
+   (the no-mock line names it, for example `google_workspace` for Gmail and
+   Calendar): only the interface, as the `enderis-adapter-author` skill says
+   in "An interface over a built-in service". Import it and skip step 2.
+2. **Otherwise build the adapter** with the `enderis-adapter-author` skill: a service
    and a `protocol="http"` interface whose `upstream["endpoint"]` is the
    origin the client calls, with one tool per route the agent uses. Import it.
-2. **Declare the boundary** in `.enderis/boundaries.md` with
+3. **Declare the boundary** in `.enderis/boundaries.md` with
    `transport: http`, the same origin as `url`, and the interface name
    ("Declare a REST API boundary" below). A live-read-only service skips
-   step 1 and has no `interface:`.
-3. **Onboard again.** Onboarding assigns that interface to the boundary.
+   steps 1 and 2 and has no `interface:`.
+4. **Onboard again.** Onboarding assigns that interface to the boundary.
    `execution_status` stays `ready` only when an Enderis origin adapter covers
    the client's library (Node `fetch`, undici and `node:http`/`node:https`
    clients such as axios, got and node-fetch; Python `httpx`, `requests`,
-   urllib3, `urllib`/`http.client` and `aiohttp`). A gRPC or HTTP/2-only
+   urllib3, `urllib`/`http.client`, `httplib2` (the Google API client's
+   transport) and `aiohttp`). A gRPC or HTTP/2-only
    client is not covered: see "No adapter possible".
 
 ## Hand-offs
@@ -580,8 +667,9 @@ the code clearly builds an MCP client that is not in `boundaries`:
 
 If an unresolved constructor only builds transports for boundaries onboarding
 already reports (for example a shared helper fed by a server map it found),
-it needs no declaration. Use `declare` only for an id that is not in
-`boundaries`. Never edit the agent's code to make a declaration pass.
+it needs no declaration. A `declare` block for an id already in `boundaries`
+replaces that boundary ("Correct a wrong guess"). Never edit the agent's code
+to make a declaration pass.
 
 ## Declare a REST API boundary (`transport: http`)
 
@@ -614,12 +702,12 @@ boundaries:
 - Onboarding picks the interface whose production origin equals `url`. When
   more than one has it, the error is `declaration_needed`: add `interface:`
   with a name from the message. When none has it and you name none, the
-  boundary stays with `no_mock`: it runs only as a live read. To mock it,
-  build an interface first ("REST boundaries" above).
+  boundary stays with `no_mock`, and its no-mock line names the interface to
+  write or the adapter to build ("REST boundaries" above).
 - `execution_status` is `ready` only when Enderis ships an origin adapter for
   the package's language (today: Node `fetch`, undici and
   `node:http`/`node:https`; Python `httpx`, `requests`, urllib3,
-  `urllib`/`http.client` and `aiohttp`); otherwise it is
+  `urllib`/`http.client`, `httplib2` and `aiohttp`); otherwise it is
   `needs_substitution` (see "No adapter possible").
 - An Enderis API that does not accept HTTP boundaries yet stops onboarding
   with "does not accept transport: http boundaries yet". Remove those

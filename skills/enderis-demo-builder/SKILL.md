@@ -261,6 +261,9 @@ itself is unknown, the CLI is old: run `enderis update` and try again.
 - Google mail and calendar are one service, `google_workspace`: a business on
   Google gets both, so never model a Google calendar without its mailbox.
 - SharePoint, OneDrive, Outlook and Teams share the `microsoft_365` service.
+  Outlook mail and calendar can be reached through Graph, Softeria, Work IQ,
+  or the Agent 365 Mail and Calendar MCP servers (`microsoft_365-mail`,
+  `microsoft_365-calendar`), all on one mailbox and calendar model.
 - Put documents and policies in `doc_library`.
 - When no built-in service fits a system, leave that system out of the first
   chat and put it under **Open questions**. A custom service comes later
