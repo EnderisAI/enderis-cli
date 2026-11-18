@@ -100,10 +100,57 @@ class CalendarRest:
         if not got:
             return http_response(404, {"error": {"code": 404, "message": got.error.message}})
         return {"items": got.result["events"]}
+
+    @tool(name="insert_event", canonical="google_workspace.create_event",
+          classification="write", route=("POST", "/calendar/v3/calendars/{calendarId}/events"),
+          schema={"parameters": {"type": "object", "properties": {
+              "calendarId": {"type": "string"}, "summary": {"type": "string"},
+              "start": {"type": "object"}, "end": {"type": "object"}}}})
+    def insert_event(self, call):
+        start, end = call.args["start"], call.args["end"]
+        args = {"calendarId": call.args["calendarId"], "summary": call.args.get("summary", ""),
+                "start": start["dateTime"], "end": end["dateTime"]}
+        if "timeZone" in start:
+            args["timeZone"] = start["timeZone"]
+        got = call.invoke("google_workspace.create_event", args)
+        if not got:
+            return http_response(400, {"error": {"code": 400, "message": got.error.message}})
+        return got.result
 ```
 
-Skip the service steps and `enderis tools test` (it checks a `behavior.py`,
-and there is none). Import the folder, then onboard again:
+Skip the service steps. Before importing, test each tool that writes: one
+case that calls it by its `@tool` name, with the arguments the route passes
+(path, query and body together), and checks the built-in's records. Most
+`google_workspace` operations need a principal, so the seed names one:
+
+```yaml
+# .enderis/tests/tools/calendar_rest.yaml
+services: [google_workspace]
+seed:
+  people:
+    - {key: ana, name: Ana, emails: [ana@acme.example]}
+  principal: ana
+cases:
+  - name: insert_event keeps the time zone
+    calls:
+      - tool: insert_event
+        args:
+          calendarId: primary
+          summary: Standup
+          start: {dateTime: "2026-03-03T09:00:00", timeZone: Europe/Berlin}
+          end: {dateTime: "2026-03-03T09:15:00", timeZone: Europe/Berlin}
+    state:
+      google_workspace: {events: [{summary: Standup, timeZone: Europe/Berlin}]}
+```
+
+```sh
+(cd .enderis && enderis tools test)
+```
+
+The test runs over the workspace's latest built-in and stores nothing. A
+reply with status 400 or more is the call's error (`HTTP <status>: <body>`).
+Fix the interface until the case passes. Then import the folder and onboard
+again:
 
 ```sh
 enderis import .enderis/services/google_workspace
@@ -293,9 +340,9 @@ including one refusal. Run it from `.enderis/`, where the CLI finds
 ```
 
 Each case prints `pass` or `FAIL` with the first mismatch. Fix the service
-until every case passes. The test calls the service's operations
+until every case passes. For your own service the test calls its operations
 (`<service>.<op>`), not the interface's tools; the first chat tests the
-tools.
+tools. Only an interface over a built-in service is tested by tool name.
 
 ## 4. Import and connect
 

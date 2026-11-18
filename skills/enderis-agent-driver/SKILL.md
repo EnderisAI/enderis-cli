@@ -63,7 +63,11 @@ Answer these before writing code. Write the answers into the body of
    launch yet (an app that is not Node or Python). If the
    repository has no front door at all, only an agent object other code
    imports, use `app: harness` (section "A harness"). Never write a harness
-   when a front door exists.
+   when a front door exists. A serverless function (a Vercel `api/*.ts`, a
+   Next.js route handler, a Lambda handler) is a front door even when its
+   platform's dev server does not start without an account: write a small
+   server in `.enderis/driver/` that imports the exported handler unchanged
+   and serves it, and launch that server with `app: launched`.
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
