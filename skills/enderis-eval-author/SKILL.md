@@ -89,6 +89,13 @@ in the starting data, the response lists any trigger, description or persona
 text that still says the old value, and text-check rewrites for the data's own
 text. An imported file is never rewritten for you: fix the lines in your files.
 
+**Trigger on the agent's front door.** For an agent whose front door is a chat
+service, such as a Slack bot, post on that service instead of `trigger: chat`:
+for a Slack DM, `listens: [slack:dm:<sender>]` and `trigger: {kind: message,
+from: <sender>, channel: slack:dm:<principal>}`. For an agent run through a
+driver, listen with `{channel: slack:dm:<sender>, wake: full}` so its wake carries
+the message record.
+
 **The trigger is a natural opener.** It is delivered verbatim. A real person
 states a problem in their own words and does not recite ids, emails or exact
 figures. Write it the way that person would type it: the problem first, in
@@ -107,6 +114,9 @@ answer, asking was optional and the check fails a correct run.
 `terse@2`) or an inline `{name, prompt}`; without one, the neutral `cooperative`.
 A cast entry without `listens:` inherits its roster entry's; `listens: []`
 subscribes to nothing.
+Do not cast someone only so they can answer: every playground resident (a
+person with a DM, chat or mailbox) answers its direct messages in every run.
+Cast a person to give them a goal, facts or a brief.
 
 ## playground.yaml
 
@@ -135,8 +145,9 @@ services:
   agent reads the time through its built-in `clock.now`. A repository
   agent reads its own machine's clock, so if the trigger says "tomorrow", state
   the absolute date. Otherwise the run grades the agent's own calendar.
-- **Money is decimal dollars in yaml** (`balance: 120.00`). Tools and snapshots
-  use integer cents (`balance_cents: 12000`), so assert in cents.
+- **Money units depend on the service.** Write amounts in the unit the
+  service's seed schema names, and assert in the unit its snapshot shows
+  (for example `balance_cents`).
 
 ## evaluator.py
 
@@ -306,9 +317,10 @@ A fixture replays the intended agent so the eval tests itself, free and keyless.
 - **One user reply per no-tool agent turn.** A turn with tool calls keeps
   control and gets no reply. Turns 0 and 2 above face the user: two replies.
 - **Disclosures contain the fact text** `asked_before` looks for ("Tran").
-- **Tool names are `product.tool`**, validated at import. `judge` entries answer
-  `judge.with_rubric` calls in order. Replay runs at seed 0, so run-generated
-  ids like `msg-0-1` only match there; evaluators must not depend on them.
+- **Tool names are the names the eval's interfaces present**, validated at
+  import. `judge` entries answer `judge.with_rubric` calls in order. Replay
+  runs at seed 0, so run-generated ids like `msg-0-1` only match there;
+  evaluators must not depend on them.
 - **Gmail keeps one copy of a message per mailbox.** A recipient's copy is
   `{id}~{mailbox}`, so a scripted read or reply names the agent's copy
   (`msg-0-1~avery@enderis.ai`). In an evaluator, filter by `mailbox` before you
@@ -350,8 +362,8 @@ Three paths store an eval:
   the import. See https://enderis.ai/docs/cli/import.
 - **Dashboard**: **Create Eval** on the agent's page gives the user a prompt for
   their coding agent, which then takes the MCP path below. The **Edit** tab of
-  an existing eval saves a new version and, when it has a fixture, launches the
-  scripted self-test, which must pass.
+  an existing eval saves a new version. **Save and run** also launches a run
+  with the selected agent and provider.
 - **MCP** from a coding agent: `get_authoring_packet`, `validate_eval` while
   drafting, then `create_eval` with `scripted_json` to launch the seed-0
   self-test; poll the returned `run_id` with `get_run` until it passes. To test

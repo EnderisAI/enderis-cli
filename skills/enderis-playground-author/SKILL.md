@@ -24,7 +24,8 @@ with `enderis import playgrounds/<name>` and fix every error it reports; if an
 error is not clear, run `enderis faq`. Then read the consistency lines the
 import returns: fix each "Not fixed" line or record why it stays under
 `exceptions:`, and import again. The web app cannot generate or copy a
-playground; every new playground and every big change comes through import. The guide opens its blueprint section
+playground. Use import for every new playground and every big change in this
+workflow. The guide opens its blueprint section
 with a complete example that imports as it is: start from it.
 
 ## Rules builders get wrong
@@ -56,6 +57,11 @@ with a complete example that imports as it is: start from it.
   rows themselves; the build script copies them unchanged. The
   records an eval depends on sit among ordinary noise, and one event shows up
   consistently across services.
+- **Give every resident a persona.** A person who holds a direct channel (a
+  Slack DM, a WhatsApp chat, a mailbox) is a resident. Give each one an
+  `actors:` entry with a library `persona` for how they talk and a
+  `description` for who they are. Import warns about each resident without
+  one and names the default persona `enderis-everyday@1`.
 - **Real-sounding names.** No acme, example, test or foo, for people or
   domains.
 - **Audit before evals.** A fresh session that did not build the playground

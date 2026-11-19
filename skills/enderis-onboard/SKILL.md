@@ -35,11 +35,25 @@ Rules for the whole path:
   prompt. When the real agent cannot run, name the blocker ("Name the
   blocker" below) and stop. Never turn on the agent's own test, demo, offline
   or mock mode (for example `TESTING=true`) to get past a service: that runs
-  other code than production. Give the service an adapter, or switch it off
-  and name it. Never patch the agent's code at launch either (a wrapper that
+  other code than production. When the repository's default settings are such
+  a mode (a `local` runtime, sample providers or fixtures in place of its
+  outside services), run it with its production settings instead, set in the
+  launch environment, so its real providers call Enderis's adapters. Give the
+  service an adapter, or switch it off and name it. Never patch the agent's code at launch either (a wrapper that
   replaces its functions or rewrites its tool calls): a call the agent sends
   to its own built-in stub stays there, as in production. When Enderis does
-  not route a call it should, name the blocker.
+  not route a call it should, name the blocker. If the repository runs its
+  own server (an entry point that listens, such as `app_oauth.py`), launch
+  that entry point unchanged; never write a server or wrapper around its app
+  object. A launcher under `.enderis/` is only for a serverless handler the
+  platform runs (Vercel, a Next.js route handler, Lambda), and does only what
+  the platform does: route each request to the handler and keep `waitUntil`
+  work alive. Never write the app's storage, fake its sign-in or install
+  state, or call framework internals. For a Slack OAuth app, the driver's
+  `start` uses the app's own install and callback routes (for example
+  `/slack/install`, then `/slack/oauth_redirect`), preserving the app's OAuth state
+  and cookies. The exchange goes to the served `oauth.v2.access`; the run principal
+  must be a bot. See the `enderis-agent-driver` skill, "A launched app".
 - **The CLI only.** Do not set up MCP and do not restart the session before the
   first chat. Every step below is an `enderis` command.
 - **When a command fails** and the fix is not in this skill, run `enderis faq`
@@ -124,11 +138,11 @@ Model key names come from source evidence. Native Node `fetch` calls to the lite
 | --- | --- |
 | `execution_status: ready` | Go on below. |
 | Several packages found, or the wrong one chosen | Write `target: <id>` in `.enderis/boundaries.md` and run again ("Correct a wrong guess"). Default: the package that holds the agent's prompt. |
-| `driver_written` in the JSON | Onboarding found an AI SDK chat route, a LangGraph server, Google ADK or Mastra, wrote a standard driver in `.enderis/driver/` and onboarded with it. Go on below with it unchanged. Edit it only when a run shows that the app's input differs (for example a graph whose input is not `messages`); `driver.md` says which graph or app it uses; the Mastra driver uses the first agent `GET /api/agents` lists. If the error names a written driver folder, delete that folder to onboard without it. |
+| `driver_written` in the JSON | Onboarding found an AI SDK chat route, a LangGraph server, Google ADK or Mastra, wrote a standard driver in `.enderis/driver/` and onboarded with it. `driver.md` says which graph, agent or app it uses; the Mastra driver uses the first agent `GET /api/agents` lists. Before going on, check that this reaches the agent's main job. If production input arrives another way (a signed webhook that starts a workflow, a queue) and the written driver reaches only one sub-agent or a dev route, delete the folder and write a driver for that front door ("Driver agents" below). Otherwise go on with it unchanged, and edit it only when a run shows that the app's input differs (for example a graph whose input is not `messages`). If the error names a written driver folder, delete that folder to onboard without it. |
 | `needs_ingress` or `needs_worker` | The agent needs a driver. See "Driver agents" below. When the JSON has `agent`, write the driver to reach the agent the way `agent.reach` and `agent.launch` say. |
 | Exit 2: `no agent target found (no_agent_target)` | If the folder holds an app that answers messages (a web server, a simulator, a queue worker), it needs a driver: see "Driver agents" below. If it holds no agent at all, take the default at once: build a demo agent with the `enderis-demo-builder` skill, and say so. When the message names a language Enderis cannot launch (Rust, Go, Java, Kotlin), onboard a listed nested package only if it is the agent, not a dashboard or client. |
-| `needs_substitution`, or `cannot_mock` not empty | A boundary cannot be mocked; each `cannot_mock` entry gives the reason. Switch that service off ("Switch a service off" below) and onboard again. |
-| Exit 2: no boundaries found | Read the code. Declare each REST API or MCP server it calls ("Declare a boundary onboarding missed", "REST boundaries"), and list each service Enderis cannot mock under `off:` ("Switch a service off"). Pass `--no-boundaries` only when it calls none. |
+| `needs_substitution`, or `cannot_mock` not empty | A boundary cannot be simulated; each `cannot_mock` entry gives the reason. Switch that service off ("Switch a service off" below) and onboard again. |
+| Exit 2: no boundaries found | Read the code. Declare each REST API or MCP server it calls ("Declare a boundary onboarding missed", "REST boundaries"), and list each service Enderis cannot simulate under `off:` ("Switch a service off"). Pass `--no-boundaries` only when it calls none. |
 | The code passes a server map to a client (langchain `MultiServerMCPClient`, or a `servers` map) | Onboarding reads a map written inline (`MultiServerMCPClient({...})`): each key is a boundary. A map built elsewhere and passed as a variable or call is listed in `unresolved_clients`: declare one boundary per map key ("Declare a boundary onboarding missed"). |
 | `unresolved_clients` or `declaration_errors` not empty | Fix them ("Declare a boundary onboarding missed"), then onboard again. |
 | A boundary that the code does not call (for example a key inside a server's settings read as a server), or no adapter fits it because it is not real | List it under `not_boundaries:` ("Correct a wrong guess") and onboard again. |
@@ -153,14 +167,15 @@ a normal setting. Driver settings remain in `driver.md`.
 2. **REST, GraphQL and SDK clients.** Onboarding finds MCP clients and these
    vendor SDKs, and connects each SDK to the built-in interface for its
    service: npm `@linear/sdk`, npm and PyPI `stripe`, npm `airtable` and PyPI
-   `pyairtable`. Each shows in `boundaries` as `<service>-api` (for example
-   `linear-api`) with its `interface`. Do not write a mock or a declaration
+   `pyairtable`, npm `@hubspot/api-client` and PyPI `hubspot-api-client`. Each shows in `boundaries` as `<service>-api` (for example
+   `linear-api`) with its `interface`. Do not write a simulated tool or a declaration
    for one of them. Search the code for other clients of outside services:
    `fetch(`, `axios`, `got`, `httpx`, `requests`, `aiohttp`, GraphQL clients,
    and other vendor SDKs such as Octokit, jsforce or `openai`-style API
-   clients (not the agent's own model client). Each one reaches production in
-   a chat unless it gets an adapter. Every REST client of a system of record
-   (CRM, tickets, mail, calendar, sheets, payments) gets an adapter, even when
+   clients (not the agent's own model client). In a chat, a call to a host that
+   has no boundary is refused, except from a client that ignores proxies and
+   adapters (a raw socket, gRPC). Every REST client of a system of
+   record (CRM, tickets, mail, calendar, sheets, payments) gets an adapter, even when
    its keys are placeholders: build it and declare the boundary as
    `transport: http` ("REST boundaries" below). Only an information source
    (step 3, item 3) may be a live read: declare it without `interface:` and do
@@ -171,11 +186,12 @@ a normal setting. Driver settings remain in `driver.md`.
 A driver carries each message to an agent whose front door onboarding cannot
 drive. Follow the `enderis-agent-driver` skill through its
 `enderis onboard`, then come back here. Do not run evals from that skill.
-When onboarding wrote a standard driver (`driver_written`), skip that skill:
-run an eval with the driver first, and edit it only if the app's input
-differs. Build output and local databases the app writes during runs
-(`.next/`, `.mastra/`, a SQLite file) are fine, even when git ignores them:
-each run starts the app in its own copy of the repository.
+When onboarding wrote a standard driver (`driver_written`) that reaches the
+agent's main job, skip that skill: run an eval with the driver first, and edit
+it only if the app's input differs. Build output and local databases the app
+writes during runs (`.next/`, `.mastra/`, a SQLite file) are fine, even when
+git ignores them: runs that overlap each get their own copy of the
+repository, and a run alone uses the folder itself.
 
 Onboarding with a driver finds boundaries, reads `.enderis/boundaries.md`
 and finds the model keys the same way as without one: the keys the code
@@ -188,8 +204,8 @@ Do checks 1 and 2 above for the app's code. Then:
 
 - If the app calls any outside service (a boundary, or a service under
   `off:`), the driver must say `app: launched`: Enderis starts the app for
-  each run with the run's mocks, and switched-off services stay off. An
-  `app: attached` or `app: managed` driver with services to mock stops
+  each run with the run's simulated services, and switched-off services stay off. An
+  `app: attached` or `app: managed` driver with services to simulate stops
   onboarding with an error that names the change. The `enderis-agent-driver`
   skill says how to write `launch`, `runtime`, the port and `ready`.
 - **Docker apps.** If developers start the app with Docker Compose, the
@@ -203,7 +219,7 @@ Do checks 1 and 2 above for the app's code. Then:
 - If the repository has no front door at all (no server, webhook or chat
   route: only an agent object that other code imports), the driver says
   `app: harness`: it imports the agent and calls it in its own process, with
-  the same mocks and switched-off services. Pick a harness only when there is
+  the same simulation and switched-off services. Pick a harness only when there is
   no front door; the run page shows it as a test entry point.
 - If it uses only its own database and its model, `app: attached` also works.
 
@@ -257,8 +273,8 @@ For each boundary that still needs a choice:
    ```
 
    A REST boundary declared without `interface:` shows `no_mock` in
-   `boundaries`. It cannot be mocked until it has an interface, and a run that
-   leaves it mocked is refused with `needs_adapter`. The no-mock line names
+   `boundaries`. It cannot be simulated until it has an interface, and a run that
+   leaves it simulated is refused with `needs_adapter`. The no-simulation line names
    what to do (an interface over a built-in service, or an adapter): do it
    without asking.
 
@@ -272,7 +288,7 @@ For each boundary that still needs a choice:
    unannotated tool, list it under the boundary's `reads:` in
    `.enderis/boundaries.md`, and say so in the hand-off. Never declare
    `POST /graphql`: it lets mutations through too. A system of record (CRM, tickets, mail, payments, calendar) is
-   mocked, by building an adapter if needed. Do not seed a live-read product in
+   simulated, by building an adapter if needed. Do not seed a live-read product in
    the playground: that makes the run `inconclusive`.
 4. **Never choose `--passthrough` without `--read-only`.** A plain passthrough
    sends the agent's writes to production. Use it only when the person asks.
@@ -291,27 +307,27 @@ Say in one line which state each service got. The person can change any of
 them.
 
 A REST boundary gets its adapter when onboarding picks its interface ("REST
-boundaries" below); `enderis connections list` then shows it as mocked.
+boundaries" below); `enderis connections list` then shows it as simulated.
 
 #### No adapter possible
 
 An adapter cannot be built when neither the code nor a consented probe shows
 the tool names and inputs, or when a client is one no Enderis origin adapter
 covers (`needs_substitution`, `cannot_mock`). Then switch that service off
-("Switch a service off" below) and go on with every other service mocked. One
-service that cannot be mocked never stops the agent.
+("Switch a service off" below) and go on with every other service simulated, if
+the app can run without the switched-off service. If it cannot, name the blocker.
 
 ## Switch a service off
 
 Each outside service ends in one state. Take the first that fits, and say in
 one line which state you took for each service:
 
-1. **A clear built-in adapter:** mock it (step 3).
+1. **A clear built-in adapter:** simulate it (step 3).
 2. **An information source with no state that matters to the eval** (web
    search, page fetch, a document library), whose key is in the person's
    environment: a live read, when the CLI offers read-only connections for its
-   transport. Until then, mock it or switch it off.
-3. **A system of record** (CRM, tickets, mail, payments, calendar): mock it,
+   transport. Until then, simulate it or switch it off.
+3. **A system of record** (CRM, tickets, mail, payments, calendar): simulate it,
    building the adapter when there is none (`enderis-adapter-author`).
 4. **Otherwise:** switch it off.
 
@@ -324,18 +340,18 @@ off:
   - name: salesforce
     hosts: [login.salesforce.com]
     gates: [SALESFORCE_TOKEN, SALESFORCE_INSTANCE_URL]
-    why: jsforce runs on node-fetch 2, which no adapter covers yet
+    why: This service is outside these evals
 ---
 ```
 
 - `hosts`: the hosts its client calls. `gates`: the variables the code reads
   to turn the service on (read its `constructed_at` file). `why`: one line.
-- In a run, the gates are absent from the app's environment, so the agent
-  does not register the service's tools, and a request to its hosts is
+- In a run, the gates are absent from the app's environment; the app decides
+  whether that disables the service's tools. A request to its hosts is
   refused and listed as `blocked_egress`.
 - A raw TCP socket (a client that ignores proxies and adapters) is not
   refused. The run lists it under `unobserved_connections` (address and port).
-  Find the library that opens it and tell the person: Enderis cannot mock it.
+  Find the library that opens it and tell the person: Enderis cannot simulate it.
 - Every agent whose app Enderis starts runs with undeclared destinations
   denied. The app can reach its boundaries, loopback and the default host
   of each model key the run passes. Add any other host it needs under
@@ -412,6 +428,14 @@ the chat ends when your command ends, and the person finds a dead link:
 enderis chat --playground <agent name>-first < /dev/null > .enderis/chat.log 2>&1 &
 ```
 
+When the agent's front door is a chat service (for example a Slack bot that
+gets Slack events), open the chat on that service: add `--channel` and `--as`,
+for example `--channel slack:dm:<agent person> --as <person>` for a Slack DM
+to the bot. Enderis posts each message on the service as that person. The
+playground must seed that conversation (for Slack, an IM with `is_im: true`
+whose members are the bot's and the person's Slack ids). If Enderis refuses
+the pair, the CLI lists the channels and people it offers.
+
 Wait for the line in `.enderis/chat.log` that starts with `chat: ` and holds
 the link. Try once to open it: `open <link>` on macOS, `xdg-open <link>` on
 Linux. If that fails or is refused, print the link once for the person and
@@ -419,10 +443,11 @@ go on. Do not try other browsers. Tell them they can type in the chat.
 
 | In `.enderis/chat.log` | Action |
 | --- | --- |
-| `needs_adapter: <boundary>` | That boundary has no connection. Go back to step 3. When the hint says it has no mock, do what it names. Never default to a live read. |
+| `needs_adapter: <boundary>` | That boundary has no connection. Go back to step 3. When the hint says it has no simulation, do what it names. Never default to a live read. |
 | `This package changed since … was onboarded` | Run `enderis onboard . --json` again, then start the chat again. |
 | A required model key is missing | Check the environment for the variable. If it is set, pass it to the agent (for an attached app, through the override in "Driver agents") and start the chat again. If not, tell the person the variable name and wait until they set it. |
 | `Not reached: <boundary>` | The agent did not connect to that boundary. That is fine when the messages did not need it. If they did, a gate variable is usually missing: see "Declare gate variables", onboard again, start the chat again. If the code never connects to it, it is not a boundary: list it under `not_boundaries:`. |
+| `the app process had exited (…)` | The launched app stopped during the chat. A signal with nothing in the app's output means a process outside Enderis killed it; an exit code means the app stopped itself, so read its output. Start the chat again. |
 | A live-read host times out | This machine cannot reach that host; it is not an Enderis fault. Check with `curl` outside the chat, tell the person, and go on. Do not pin an address or route around it. |
 | No `chat: ` line, and the chat ended | Run `enderis update`, then start the chat again. |
 
@@ -436,7 +461,12 @@ Do this while the person chats. Do not ask for a yes.
 2. **Draft three to five evals** with the `enderis-eval-author` skill, in
    `.enderis/evals/<eval name>/`, on that playground. Cover the agent's main
    job, one hard case from its prompt, and one case where it must refuse or
-   ask. In each `eval.md`, list the adapter of every connection under
+   ask. When the front door is a chat service, the trigger is a post on that
+   service, not `trigger: chat`: for a Slack bot, `trigger: {kind: message,
+   from: <person>, channel: slack:dm:<agent person>}` with `listens:
+   [slack:dm:<person>]`. When the agent runs through a driver, write
+   `listens: [{channel: slack:dm:<person>, wake: full}]`: only a `full` wake
+   gives the driver the message record it builds the Slack event from. In each `eval.md`, list the adapter of every connection under
    `interfaces:` (`- {service: <service>, interface: <adapter name>}`), so the
    eval measures the tools the agent really sees. Without it, the eval
    measures `<service>-canonical`. A `scripted.json` is optional here: it
@@ -460,9 +490,10 @@ Do this while the person chats. Do not ask for a yes.
    ```
 
    It prints the run link at the end. Open it the same way as the chat link.
-   Run only this one; more live runs wait for the person. If it prints
-   `waiting: … is in use by another command`, the open chat holds the app (a
-   driver app that one run at a time may use). Leave the run waiting in the
+   Run only this one; more live runs wait for the person. It runs next to
+   the open chat. If it prints `waiting: … is in use by another command`, the
+   open chat holds the app (an attached app with `isolation: exclusive`, or an
+   app that ignores the port Enderis gives it). Leave the run waiting in the
    background, or run it after the chat ends, and tell the person which.
 5. **Report** in a few lines: the chat link, the defaults you took, the
    adapters you built, the evals and the live run's verdict. If the run
@@ -478,7 +509,11 @@ After every change to `.enderis/`, the connections or the playground, run:
 enderis chat --check --json
 ```
 
-It starts the agent once on its mocks, sends one short message through its
+When the chat runs on a service channel (step 5), add the same `--channel` and
+`--as`, for example
+`enderis chat --check --json --channel slack:dm:<agent person> --as <person>`.
+
+It starts the agent once on its simulation, sends one short message through its
 front door and prints one result. Run it again after each fix until `ok` is
 `true`. A `null` never makes `ok` false: when every other entry is `true`, go
 on to the chat. For each entry in `checks` with `ok: false`, do what its
@@ -487,12 +522,13 @@ on to the chat. For each entry in `checks` with `ok: false`, do what its
 | `check` | Fix |
 | --- | --- |
 | `agent_started` | Read `detail`. `needs_adapter`: step 3. No playground: step 4. Otherwise run with `--debug` to see the agent's own output. |
-| `front_door` | The agent started but did not answer. Run with `--debug`; fix the driver or `.enderis/launch.md`, never the agent. |
+| `front_door` | The agent started but did not answer. Run with `--debug`; fix the driver or `.enderis/launch.md`, never the agent. When the app did not answer within the driver's settle time, also fix each failing `unserved_request` or `connection` first: a failed call often makes the app drop the message. |
 | `front_door` (`ok: null`) | The agent finished without a text reply. Some agents answer only a task. Go on to the chat and do its `next` there: send a task that needs a reply. Fix the driver only if that also shows no reply. |
 | `model_key` | Export the key the agent reads. If onboarding named the wrong key, declare `model_keys:`. |
 | `boundary` | "no adapter is assigned": assign one (step 3), or switch the service off. If the code does not call it at all, add the `correction` line (`not_boundaries: [<id>]`) instead. |
+| `unserved_request` | The agent called a path (`id`, for example `POST /auth.test`) that no route of the boundary's simulation serves. When `next` names a prefix, the boundary's `url` lacks the path the SDK uses: declare it with that path (for example `url: https://slack.com/api/`) and onboard again. Otherwise the interface lacks the route: add it (`enderis-adapter-author`). |
 | `connection` | The agent called a host that is no boundary. Declare it as a boundary (`transport: http`) or, for a model, install or telemetry host, list it under `allow:`. |
-| `unseen_connection` (`ok: null`) | The agent opened a connection around Enderis (a raw socket or native client), so it was not mocked. Tell the user it may reach production; Enderis cannot simulate it. |
+| `unseen_connection` (`ok: null`) | The agent opened a connection around Enderis (a raw socket or native client), so it was not simulated. Tell the user it may reach production; Enderis cannot simulate it. |
 | `interaction` (`ok: null`) | The agent asked for approval; the check rejected it. Nothing to fix; an eval tests that action. |
 
 `ok: null` means this run cannot tell. "inferred but never seen" is `null`:
@@ -557,7 +593,7 @@ Do not draft evals for an agent that cannot run.
 A REST, GraphQL or SDK client gets its adapter in this order:
 
 1. **Write an interface over a built-in service** when one models the API
-   (the no-mock line names it, for example `google_workspace` for Gmail and
+   (the no-simulation line names it, for example `google_workspace` for Gmail and
    Calendar): only the interface, as the `enderis-adapter-author` skill says
    in "An interface over a built-in service". Import it and skip step 2.
 2. **Otherwise build the adapter** with the `enderis-adapter-author` skill: a service
@@ -592,7 +628,7 @@ is off, and that the evals cannot see what the agent would do with it.
 An agent often builds a client only when some variables are set: a token, a
 flag such as `ENABLE_SLACK=true`, a base URL, or a credentials file path. If a
 run cannot set them, the agent never connects and the run reports
-`Not reached: <boundary>`. For a boundary that is not mocked, `enderis run`
+`Not reached: <boundary>`. For a boundary that is not simulated, `enderis run`
 passes your real values only for the gates listed here or found in the code;
 it skips any other name with a warning.
 
@@ -614,13 +650,11 @@ boundaries:
 
 Kinds: `secret` (a token or key), `flag` (any non-empty value turns it on),
 `url` (an endpoint), `file` (a path the code opens). Run `enderis onboard . --json`
-again and check that `gates` now lists them.
+again and check that `gates` now lists them. Simulated `secret` gates receive
+deterministic placeholders shaped for the service's credentials.
 
-When the client loads a credential file before its first call (an OAuth token
-file, a service-account JSON) and a mocked run must still reach the service,
-write a fake one in the format the client reads under `.enderis/` (no real
-secret; the mock accepts any credential) and point the agent's own setting at
-it, for example through the driver's environment.
+A simulated `file` gate gets Enderis's fixed placeholder JSON, which a client
+that parses a real credential file (a service-account JSON, a token file) rejects.
 
 ## Declare a boundary onboarding missed
 
@@ -676,11 +710,14 @@ to make a declaration pass.
 
 Onboarding finds MCP clients and the known vendor SDKs listed under "2.
 Onboard". An agent that calls another REST API with its own
-`fetch`, or with another vendor SDK built on it, has no boundary for that API,
-and its calls reach production. A declaration for a known SDK's origin, or its
-service under `off:`, replaces the boundary onboarding would add for it. Declare each origin you find in the code before
-the first chat ("REST boundaries" above). A run also reports each call to an
-undeclared origin as `unmodeled_egress`; declare that origin too:
+`fetch`, or with another vendor SDK built on it, has no inferred boundary for
+that API. In a chat, a call to a host that has no boundary is refused, except
+from a client that ignores proxies and adapters (a raw socket, gRPC). A
+declaration for a known SDK's origin, or its service under `off:`, replaces the
+boundary onboarding would add for it. Declare each origin you find in the code before
+the first chat ("REST boundaries" above). A run reports denied requests as
+`blocked_egress` and unexpected observed connections as `unmodeled_egress`.
+Declare each of those origins too:
 
 ```yaml
 boundaries:
@@ -688,7 +725,7 @@ boundaries:
     declare:
       transport: http
       constructed_at: src/whatsapp.ts:12   # path:line where the client is built
-      url: https://graph.facebook.com      # the origin: scheme, host, port only
+      url: https://graph.facebook.com      # the base URL the client uses
       package: "@acme/whatsapp-sdk"        # only when a vendor SDK builds it
       interface: whatsapp-cloud-http       # only when the origin picks no interface
     WHATSAPP_TOKEN: secret
@@ -696,14 +733,19 @@ boundaries:
 ```
 
 - You decide where the client is built; the CLI checks only that `url` is an
-  origin with no credentials, path or query (`origin`), that the
+  http(s) URL with no credentials, query or fragment (`origin`), that the
   `constructed_at` file exists, and that each gate variable is read
   (`gate_read`).
 - If the base URL comes from configuration, list that variable as a `url` gate.
-- Onboarding picks the interface whose production origin equals `url`. When
+  A simulated run sets it to the simulation's route plus the path of `url`. So declare
+  the full base URL the SDK uses, path included: for `slack_sdk` or
+  `@slack/web-api`, `url: https://slack.com/api/`, not `https://slack.com`.
+  Without the path, the agent calls `/auth.test` where the simulation serves
+  `/api/auth.test`, and the health check reports `unserved_request`.
+- Onboarding picks the interface whose production origin equals the origin of `url`. When
   more than one has it, the error is `declaration_needed`: add `interface:`
   with a name from the message. When none has it and you name none, the
-  boundary stays with `no_mock`, and its no-mock line names the interface to
+  boundary stays with `no_mock`, and its no-simulation line names the interface to
   write or the adapter to build ("REST boundaries" above).
 - `execution_status` is `ready` only when Enderis ships an origin adapter for
   the package's language (today: Node `fetch`, undici and
@@ -717,7 +759,7 @@ boundaries:
 ## Connections in the web app
 
 The agent's **Connections** section in Agent Details shows the same choices:
-**Mocked with an adapter**, **Not mocked** (the real service), or **Routed to
+**Simulated with an adapter**, **Not simulated** (the real service), or **Routed to
 your own host** (an MCP URL such as a staging system; the URL must carry no
 credential). By default a routed run removes the credentials the agent
 configured on its client. To keep them, the owner lists the origin
@@ -733,6 +775,10 @@ Reference: https://enderis.ai/docs/agents/onboarding.
 - **Repository side:** a wrong package, launch command or prompt pointer comes
   from the source. Report it with the exact evidence; the owner fixes the
   source, then onboards again.
+- **Machine side:** a run that stops with `… declares engines.node <range>,
+  but node on PATH is <version>` means this machine's Node does not match the
+  package. Put a matching Node first on `PATH` and run again; never change the
+  range.
 - **A missing adapter** is not a blocker: build one with the
   `enderis-adapter-author` skill.
 - **Enderis side:** an API error you cannot fix from here, or a client no

@@ -1,6 +1,6 @@
 // Harness template (Node): import the agent and call it in this process.
 //
-// Enderis starts this file in the agent's folder with the run's mocked
+// Enderis starts this file in the agent's folder with the run's simulated
 // services, switched-off services and model keys already in place, and with
 // `@enderis/driver` loaded first, so stdout and stdin are off the protocol
 // before agent code loads. Change the parts marked TODO;

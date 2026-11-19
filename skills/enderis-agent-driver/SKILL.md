@@ -33,9 +33,9 @@ reads other fields, or a different graph or Mastra agent than the one the
 driver uses (`GRAPH` or `AGENT` in driver.py). Then run
 `enderis driver check` and `enderis onboard` again. Build output and local
 databases the app writes during runs (`.next/`, `.mastra/`, a SQLite file)
-are fine, even when git ignores them: each run starts the app in its own
-copy of the repository, so do not add symlinks, copies or launchers to move
-them.
+are fine, even when git ignores them: overlapping runs use copies of the
+repository; without a copy, runs use the folder itself, one at a time. Do not
+add symlinks, copies or launchers to move them.
 
 A driver is for a front door onboarding cannot drive. If the front door works
 but onboarding missed some of the agent's MCP clients, do not write a driver:
@@ -52,12 +52,20 @@ Answer these before writing code. Write the answers into the body of
 2. **Front door.** Is there an entry point real users reach (a webhook, a chat
    API)? Or only a test harness (a simulator, an events API)? Prefer the real
    one. Set `front_door: production` or `harness` honestly; the run page shows it.
+   A framework's dev route to one agent (such as Mastra's
+   `/api/agents/{agent}/generate`) is not the front door when production input
+   arrives as a webhook that starts a workflow: drive the webhook, signed the
+   way the app checks it. A step that waits for a person, such as an approval,
+   is part of the job: send that person's answer the way the app's approval
+   route takes it. Any secret the app checks (a webhook signing secret, an
+   approval secret) is one the driver makes for the run and sets in the app's
+   environment; that is not a real credential.
 3. **Start.** How does the app start without edits? Find the existing script
    or command and the environment it reads. Use `app: launched` when you can:
-   Enderis starts the app for each run with the run's mocked services and
+   Enderis starts the app for each run with the run's simulated services and
    switched-off services (section 2, "A launched app"). It is required when
    the app calls any outside service, because only an app Enderis starts gets
-   the mocks. Use `app: attached` (you start the app before the run) or
+   the simulated services. Use `app: attached` (you start the app before the run) or
    `app: managed` (the driver's `start` and `stop` hooks start one copy per run
    slot) only for an app that calls no outside service, or one Enderis cannot
    launch yet (an app that is not Node or Python). If the
@@ -71,8 +79,13 @@ Answer these before writing code. Write the answers into the body of
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
-5. **Isolation.** The default is `isolation: exclusive`: one run at a time uses
-   the app. Use `isolation: namespace` only when each run gets its own
+5. **Isolation.** For `app: launched` or a harness, keep `isolation: exclusive`;
+   it changes nothing: each run starts its own app in its own copy of the
+   repository folder, so runs overlap and an open `enderis chat` never makes an
+   `enderis run` wait. An app that ignores the port Enderis gives it goes one
+   run at a time on its own. For `app: attached`, the default
+   `isolation: exclusive` means one run at a time uses the app. Use
+   `isolation: namespace` only when each run gets its own
    namespace in the shared app (chat ids, user ids, tenant) derived from the
    run id, the driver reads only that namespace's output, and the app keeps no
    other state one run can change for another. To run evals in parallel
@@ -84,9 +97,9 @@ Answer these before writing code. Write the answers into the body of
    A hand-off to a human is an escalation, which the driver reports. An eval
    sees only channel messages (replies and the simulated people's messages),
    channel records and escalations, and, for a launched app or a harness, the
-   records its mocked boundaries change and its MCP calls (the driver does not
+   records its simulated boundaries change and its MCP calls (the driver does not
    report them). An attached or managed app's own API calls are
-   not mocked and not seen, so an eval cannot grade them.
+   not simulated and not seen, so an eval cannot grade them.
 7. **Knowledge.** Where does the agent's knowledge and data live (files,
    database, an API)? The app keeps using it during runs. It decides which evals
    make sense: ones whose answer shows in what the agent says.
@@ -155,6 +168,12 @@ app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
   Procfile, as a list. It runs in the folder you onboard. It must start a Node
   or Python process that serves the front door. For an app that runs with
   Docker Compose, see "A Docker Compose app" below.
+- If the nearest `package.json` sets `engines.node`, Enderis checks the app's
+  Node before it starts the app: the `node` first on `PATH` when `launch`
+  starts with `node`, `npm`, `npx`, `pnpm` or `yarn`, or the binary when it
+  starts with an absolute path to `node`. On a mismatch the run stops. Put a
+  matching Node first on `PATH`, or start `launch` with the absolute path of a
+  matching `node`; do not edit the range.
 - Port: find where the app reads its port. If it reads a variable, set
   `port_env` to it. If the port is a command-line flag, put `"{port}"` (quoted)
   in that argument, for example `[uvicorn, app:app, --port, "{port}"]`. Never
@@ -164,14 +183,15 @@ app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
   path behind a sign-in. Enderis does not follow redirects.
 - `app_env`: only settings the app needs that are not secret. Never list a
   model key, a boundary gate or a secret: model keys reach the app from
-  onboarding, and gate variables are set by Enderis.
+  onboarding, and gate variables are set by Enderis. Simulated secret gates get
+  deterministic placeholders shaped for the service's credentials.
 - The driver reads the app's address from `ENDERIS_APP_URL`. Do not list it
-  in `settings`, and never list a model key or the gate variable of a mocked
+  in `settings`, and never list a model key or the gate variable of a simulated
   or switched-off service there: onboarding refuses it.
 - Start the driver with plain `python3` or `node` in `command`. A driver that
   skips `PYTHONPATH` (`python3 -I` or `-S`) cannot load the network guard, and
   the run stops before the first message. The driver runs from the run's copy
-  of the repository.
+  of the repository when there is one, otherwise from the original folder.
 - The app and the driver get an empty `HOME` of the run's own, not yours, so
   nothing in your home folder (a CLI login, its plugins or settings) reaches
   the run. `app_env` cannot name `HOME`.
@@ -179,6 +199,94 @@ app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
 Enderis starts the app with undeclared destinations denied. If the app needs
 a host other than its boundaries and its model provider's default host, add
 it under `allow:` in `.enderis/boundaries.md` (the `enderis-onboard` skill).
+
+What `launch` may start:
+
+- If the repository runs its own server (an entry point that listens, such as
+  `app_oauth.py`), launch that entry point unchanged. Never write a server or
+  wrapper around its app object.
+- A launcher under `.enderis/` is only for a repository with no server of its
+  own: a serverless handler the platform runs (Vercel, a Next.js route
+  handler, Lambda). It does only what the platform does: route each request
+  to the handler and keep `waitUntil` work alive. It never writes the app's
+  storage, never fakes sign-in or install state, and never calls framework
+  internals.
+- For a Slack OAuth app, `start` uses the app's own install and callback
+  routes (for example `/slack/install`, then `/slack/oauth_redirect`),
+  preserving the app's OAuth state and cookies. The exchange goes to the served
+  `oauth.v2.access`; the run principal must be a bot.
+
+### A chat service front door
+
+For a bot on a chat service (Slack, Microsoft Teams, Discord), the service
+sends the bot an event, the bot answers 200 at once, and it posts its answer
+later through the service's API.
+
+- The person's message is already in the service: Enderis posted it as that
+  person, because the eval (or the chat) starts on the service's channel.
+- The driver builds the platform's event from the wake's delivery (`entity`,
+  `thread`, `sender`, `data`) and sends it to the bot, signed as the platform
+  signs it.
+- Never post through the agent's route, and never read the service through it
+  to look for the answer: each call shows on the run page as the agent's own
+  action.
+- Return no `replies` (the bot's own post is the reply). When the driver
+  cannot see when the bot's work ends, return
+  `WakeResult(settle_timeout_s=60)` (at least 5, never with `replies`):
+  Enderis waits until the agent's calls delivered a message with text to every
+  sender of the wake (a streamed post counts once it is filled) and then
+  stopped for 3 seconds. The wait ends by `ctx.request_timeout` after
+  the wake was sent. When it runs out, the wake is accepted as it is and the
+  eval grades it: staying silent can be right. A driver that already waits for
+  the work (the `/__settled` path below) does not need settle.
+
+### A Slack Events API app
+
+A Slack bot's front door is its Events API route (often `/api/events`). The
+driver turns each wake into the request Slack would send. The bot answers
+through the Slack Web API, which the run simulates, so the driver returns no
+`replies` (section "A chat service front door").
+
+- The eval listens with `wake: full`, so each delivery carries `data`, the
+  message as the bot's own reads show it (`ts`, `channel`, `user`, `text`,
+  `thread_ts`, `subtype`). The kinds: `slack:mention:<bot>` (event
+  `slack.app_mention`), `slack:assistant:<user>` (`slack.assistant_thread_started`)
+  and `slack:dm:<user>` (`slack.message_delivered`, a DM message).
+- Build the event from `data`: `app_mention` and `message` (with
+  `channel_type: "im"`) copy `user`, `text`, `ts`, `channel`, `thread_ts` and
+  `subtype` when set, with `event_ts` equal to `ts`. `assistant_thread_started`
+  is `{"assistant_thread": {"user_id": user, "channel_id": channel,
+  "thread_ts": ts, "context": {}}, "event_ts": ts}`, where `channel` is the
+  DM. In Slack, `context.channel_id` is the channel the user was viewing when
+  they opened the pane, never the DM; a run has no such channel, so send
+  `context` empty.
+- Wrap it: `{"type": "event_callback", "token": "enderis", "team_id": team,
+  "api_app_id": app, "event_id": "Ev" + delivery["id"], "event_time":
+  int(float(ts)), "authorizations": [{"team_id": team, "user_id": bot,
+  "is_bot": true}], "event": event}`. Take `team`, `app` and `bot` (the bot's
+  user id in the seed) from the driver's `settings`. Every value then comes
+  from the run, so a replay sends the same body.
+- Sign it as Slack does. Declare the secret as a gate of the Slack boundary
+  in `.enderis/boundaries.md` (`SLACK_SIGNING_SECRET: secret`, see the
+  `enderis-onboard` skill); without it the app has no secret and throws on a
+  signed request. The app and the driver then get the same deterministic,
+  credential-shaped placeholder for it. Send
+  `X-Slack-Request-Timestamp: <now, in seconds>` and `X-Slack-Signature: v0=` +
+  hex HMAC-SHA256 of `v0:<timestamp>:<body>` with that secret. Wall time is
+  right here: the app compares it with its own clock, and Enderis does not
+  record these headers.
+- `waitUntil`: a Vercel function answers 200 at once and does its work in
+  `waitUntil(promise)` from `@vercel/functions`. Answer the wake only after
+  that work ends. Launch a small Node server from `.enderis/driver/` instead of
+  `vercel dev`: it imports the route's `POST` handler, sets
+  `globalThis[Symbol.for("@vercel/request-context")] = {get: () => ({waitUntil:
+  (p) => pending.push(p)})}` before it calls the handler, and answers a second
+  path (for example `/__settled`) once every promise in `pending` has settled.
+  The driver calls that path before it returns the wake. The bot's code is not
+  changed. A TypeScript handler whose imports have no file extension loads
+  only through a TypeScript loader: start the server with the repository's
+  own `tsx` (`node --import tsx server.mjs`) when it has one. Or return
+  `settle_timeout_s` instead of calling `/__settled`.
 
 ### A Docker Compose app
 
@@ -206,12 +314,12 @@ ready: /healthz
   containers, networks, volumes and the images the run built. If the command
   is killed, the next `enderis run` of the agent removes them.
 - The front door service and every service built from the repository get the
-  network guard, the mocks and the model keys. Their containers must run Node
+  network guard, the simulated services and the model keys. Their containers must run Node
   18.19 or later, or Python. If the guard does not load in one of them (for
   example, an entrypoint that clears the environment, such as `env -i`), the
   run stops before the first message.
 - Every other service (a prebuilt image) gets no guard, no model key, and
-  every mocked or switched-off gate empty. Under the deny policy it joins only
+  every simulated or switched-off gate empty. Under the deny policy it joins only
   a network with no route out, and the run prints its name. A prebuilt service
   that shares another network (`network_mode`) is refused under deny.
 - A switched-off service's gate is absent in the guarded services, even when
@@ -253,7 +361,7 @@ command: [python3, driver.py]      # node: [node, driver.mjs]
 app_env: [SITE_NAME]               # non-secret settings the agent needs
 ```
 
-- Enderis starts the driver in the folder you onboard, with the run's mocked
+- Enderis starts the driver in the folder you onboard, with the run's simulated
   services, switched-off services, model keys and `app_env` already in place,
   before the driver imports anything. One process serves one run, so the same
   agent object answers every wake; keep the conversation in `ctx.state`.
@@ -269,7 +377,7 @@ app_env: [SITE_NAME]               # non-secret settings the agent needs
 - Claude Agent SDK: its `claude` CLI is a native program the in-process guard
   does not reach. Its model traffic goes through the run's proxy
   (`HTTPS_PROXY`), which allows only the model host and declared hosts. MCP
-  servers given in `mcp_servers` are not mocked yet: switch them off under
+  servers given in `mcp_servers` are not simulated yet: switch them off under
   `off:` or keep the agent's tools in-process (SDK MCP tools, which the guard
   covers).
 
@@ -310,6 +418,9 @@ run appears in it.
 
 - Never edit customer code, config or scripts. Add files only under
   `.enderis/`. Compose or environment overrides that start the app are allowed.
+- Never write a stand-in for an app that has its own server: launch its entry
+  point. Never write the app's storage, fake its sign-in or install state, or
+  call framework internals. Create that state through the app's own routes.
 - Never put a secret in `driver.md`. Settings name variables; values come from
   the environment.
 - Never acknowledge the app's output for a wake Enderis did not accept.

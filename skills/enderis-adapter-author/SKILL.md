@@ -8,7 +8,7 @@ description: >-
   interface under .enderis/services/ from the template; test it, import it
   and connect the boundary. Use when
   `enderis connections list` shows no adapter that fits a boundary, or when
-  asked to mock a private or custom MCP server or REST API for Enderis runs.
+  asked to simulate a private or custom MCP server or REST API for Enderis runs.
 ---
 
 # Building an adapter for one boundary
@@ -163,10 +163,12 @@ boundary's origin. If more than one interface has that origin, onboarding
 asks for `interface:` in the boundary's declaration: name yours there. This
 works for repository-agent runs (`enderis run`, `enderis serve`).
 
-Google clients: a recent `google-api-python-client` uses the discovery
+Google clients: `google-api-python-client` 2.0 or later uses the discovery
 documents bundled with it, so it reads nothing from the network to build a
-client. Its token refresh goes to `oauth2.googleapis.com`, which a run does
-not mock, so give the run a static test token with a far-future expiry.
+client. The Google, Microsoft and Slack built-in interfaces serve token
+exchange and refresh routes; Google also serves service-account token grants.
+Token hosts come with the interface: do not declare separate boundaries for
+them. If the same service also has a direct boundary, its token hosts stay live.
 
 ## 1. Read the real surface
 
@@ -364,7 +366,7 @@ over a built-in service").
   enderis connections set <boundary> --adapter <service>-<short>
   ```
 
-  It prints `<boundary> (mcp): mocked with <service>-<short> (revision N)`.
+  It prints `<boundary> (mcp): simulated with <service>-<short> (revision N)`.
 - **A REST boundary:** declare it in `.enderis/boundaries.md` with
   `transport: http`, `url:` the same origin as `upstream["endpoint"]`, and
   `interface: <service>-<short>`, then run `enderis onboard . --json`.
@@ -372,12 +374,13 @@ over a built-in service").
   skill has the full declaration format ("Declare a REST API boundary").
 
 After any change to a file in `.enderis/services/<service>/`, import again.
-A new import makes a new adapter revision, and a connection stays on the
-revision it was set to: run the same `connections set` command again (for a
-REST boundary, onboard again). A run uses the interface code of that
-revision. The operations and records come from the service version that the
-playground pinned when it was imported, so after a change to `behavior.py`,
-import the playground and its evals again too.
+Import stores or reuses an adapter revision, and a connection stays on the
+revision it was set to: run
+`enderis connections set <boundary> --adapter <service>-<short>` again (for a
+REST boundary too). A run uses the interface code of that revision. The
+operations and records come from the service version that the playground
+pinned when it was imported, so after a change to `behavior.py`, import the
+playground and its evals again too.
 
 ## 5. Prove it
 
@@ -395,8 +398,8 @@ echo "<a message that needs the tool>" | enderis chat --playground <playground>
 
 The CLI starts the agent, sends the message, prints the reply after
 `agent>`, and ends with the run link. Check that the reply carries data from
-the playground's seed. On the run page, the call shows as a step named for
-the service operation it reached (`<service>.<op>`).
+the playground's seed. On the run page, an MCP call shows as a step named
+`<service>.<op>`; a REST call shows as a step named for the route the agent called.
 
 | Problem | Action |
 | --- | --- |

@@ -570,6 +570,7 @@ again for the real agent:
 enderis import evals --agent <real agent> --acceptance --authored-by coding-agent
 ```
 
-They run unchanged when the real agent uses the same services.
+They run unchanged when the real agent reaches the same services through the
+same interfaces (`enderis connections list` shows them).
 Where it calls the customer's own API, add an interface for that API with
 the `enderis-adapter-author` skill.

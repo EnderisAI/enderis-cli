@@ -1,6 +1,6 @@
 """Harness template (Python): import the agent and call it in this process.
 
-Enderis starts this file in the agent's folder with the run's mocked services,
+Enderis starts this file in the agent's folder with the run's simulated services,
 switched-off services and model keys already in place. Change the parts marked
 TODO; `harness-frameworks.md` in the skill shows `ask` for each framework.
 """
