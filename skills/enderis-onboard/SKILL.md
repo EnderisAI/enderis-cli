@@ -11,6 +11,8 @@ description: >-
 
 # Onboarding an agent repository with the enderis CLI
 
+Read `enderis capabilities` first for this CLI's client coverage, tested versions, front doors and exclusions.
+
 The goal is a chat: the person talks to their own agent in the browser as
 soon as possible. Evals come after, behind the chat.
 
@@ -114,9 +116,16 @@ enderis onboard . --json
 ```
 
 Read `execution_status`, `name` (the agent's name), `boundaries` (each has an
-`id`, a `protocol`, a `basis`, `constructed_at` and `gates`), `model_keys`,
+`id`, a `protocol`, a `basis`, `inferred`, `constructed_at` and `gates`), `model_keys`,
 `prompt_urls`, `unresolved_clients`, `declaration_errors`, `cannot_mock`,
 `switched_off`, `corrections`, `agent` and `next_actions`.
+
+Follow each diagnostic’s `code`. Only `cannot_mock` and health-check entries
+have `next`; other diagnostics use `next_actions`. An `inferred: true` item
+is a guess, not a reason to switch a service off. If it blocks launch, correct
+`not_boundaries:`, transport or url in `.enderis/boundaries.md`, or build the
+adapter, then onboard again. A dropped SDK boundary (`sdk_interface`) can be
+confirmed with `enderis chat --check` only when `execution_status` is `ready`.
 
 Onboarding reads the code and guesses. When a guess is wrong (a boundary
 that is not one, a wrong transport or URL, the wrong model key, the wrong
@@ -132,7 +141,25 @@ adapter to a boundary that is not real.
 skill's template folder to start from (`http`, `python-harness` or
 `node-harness`).
 
-Model key names come from source evidence. Native Node `fetch` calls to the literal OpenAI HTTPS Chat Completions or Responses endpoint can name `OPENAI_API_KEY` without an SDK. A Python `openai-agents` package using the default client can name its default `OPENAI_API_KEY` without an explicit environment read. Custom model/client/provider configuration suppresses that guess. Onboarding never reads the values; the local runner resolves the named keys from the environment or the package's `.env`.
+A run passes every set built-in model key from the operator's shell or package
+`.env`, with shell values winning. Static inference is evidence, not a filter.
+`model_keys:` restricts the names; `model_keys: []` passes none. Onboarding's
+`model_keys` and the health check print the key names selected to pass to the
+agent on this machine.
+Use `onboard --no-dotenv` to report shell keys only. Show the list to the person
+once; never show values. Onboarding reads values
+locally to find the set names, and uploads names only.
+
+An extra name needs approval on the runner machine. Ask the person to run
+`enderis model-keys <NAME> --host <HOST>` themselves and confirm its terminal
+prompt. Never approve it for them. Declare the key under `model_keys:` and
+its model hosts under `allow:` with `why: model`. The local approval must cover
+every such model host, and the run must deny unknown destinations. Built-in
+names do not need this extra approval. A declaration alone never adds a name.
+Approvals live in the operator-selected CLI config directory; edit that file
+to remove an approval. API responses and repository declarations cannot select
+this directory or create machine approvals. The terminal prompt confirms intent.
+
 
 | Result | Action |
 | --- | --- |
@@ -141,8 +168,8 @@ Model key names come from source evidence. Native Node `fetch` calls to the lite
 | `driver_written` in the JSON | Onboarding found an AI SDK chat route, a LangGraph server, Google ADK or Mastra, wrote a standard driver in `.enderis/driver/` and onboarded with it. `driver.md` says which graph, agent or app it uses; the Mastra driver uses the first agent `GET /api/agents` lists. Before going on, check that this reaches the agent's main job. If production input arrives another way (a signed webhook that starts a workflow, a queue) and the written driver reaches only one sub-agent or a dev route, delete the folder and write a driver for that front door ("Driver agents" below). Otherwise go on with it unchanged, and edit it only when a run shows that the app's input differs (for example a graph whose input is not `messages`). If the error names a written driver folder, delete that folder to onboard without it. |
 | `needs_ingress` or `needs_worker` | The agent needs a driver. See "Driver agents" below. When the JSON has `agent`, write the driver to reach the agent the way `agent.reach` and `agent.launch` say. |
 | Exit 2: `no agent target found (no_agent_target)` | If the folder holds an app that answers messages (a web server, a simulator, a queue worker), it needs a driver: see "Driver agents" below. If it holds no agent at all, take the default at once: build a demo agent with the `enderis-demo-builder` skill, and say so. When the message names a language Enderis cannot launch (Rust, Go, Java, Kotlin), onboard a listed nested package only if it is the agent, not a dashboard or client. |
-| `needs_substitution`, or `cannot_mock` not empty | A boundary cannot be simulated; each `cannot_mock` entry gives the reason. Switch that service off ("Switch a service off" below) and onboard again. |
-| Exit 2: no boundaries found | Read the code. Declare each REST API or MCP server it calls ("Declare a boundary onboarding missed", "REST boundaries"), and list each service Enderis cannot simulate under `off:` ("Switch a service off"). Pass `--no-boundaries` only when it calls none. |
+| `needs_substitution`, or `cannot_mock` not empty | Follow each entry’s `code` and `next`. `confirm_boundary` is a guess: correct a blocking boundary gap or build its adapter, then onboard again; use the health check for a dropped SDK boundary (`sdk_interface`) only when `execution_status` is `ready`. Only a registry fact may suggest switching a service off; build an adapter first when possible. |
+| Exit 2: no boundaries found | Read the code. Declare each REST API or MCP server it calls ("Declare a boundary onboarding missed", "REST boundaries"), and confirm unresolved clients before choosing a connection. Pass `--no-boundaries` only when it calls none. |
 | The code passes a server map to a client (langchain `MultiServerMCPClient`, or a `servers` map) | Onboarding reads a map written inline (`MultiServerMCPClient({...})`): each key is a boundary. A map built elsewhere and passed as a variable or call is listed in `unresolved_clients`: declare one boundary per map key ("Declare a boundary onboarding missed"). |
 | `unresolved_clients` or `declaration_errors` not empty | Fix them ("Declare a boundary onboarding missed"), then onboard again. |
 | A boundary that the code does not call (for example a key inside a server's settings read as a server), or no adapter fits it because it is not real | List it under `not_boundaries:` ("Correct a wrong guess") and onboard again. |
@@ -193,13 +220,12 @@ writes during runs (`.next/`, `.mastra/`, a SQLite file) are fine, even when
 git ignores them: runs that overlap each get their own copy of the
 repository, and a run alone uses the folder itself.
 
-Onboarding with a driver finds boundaries, reads `.enderis/boundaries.md`
-and finds the model keys the same way as without one: the keys the code
-names or, when it names none, the default key of each model SDK it imports
-or each provider-prefixed model string (`"openai/gpt-5"`). A run passes each
-key that is set. It needs at least one key the code names (the others are
-optional); when every key is a guess from imports, it needs at least one. An
-AI SDK string model implies only `AI_GATEWAY_API_KEY`, not the provider's key.
+Onboarding with a driver finds boundaries and reads `.enderis/boundaries.md`.
+An app Enderis starts gets every set built-in model key unless `model_keys:`
+restricts the names; an empty list passes none. The local operator must approve
+extra names as described above. At least one selected key must be set when local inspection finds a model
+provider or a nonempty `model_keys:` declaration asks for one. An agent with
+no model evidence can run keyless; `model_keys: []` passes none.
 Do checks 1 and 2 above for the app's code. Then:
 
 - If the app calls any outside service (a boundary, or a service under
@@ -313,9 +339,12 @@ boundaries" below); `enderis connections list` then shows it as simulated.
 
 An adapter cannot be built when neither the code nor a consented probe shows
 the tool names and inputs, or when a client is one no Enderis origin adapter
-covers (`needs_substitution`, `cannot_mock`). Then switch that service off
-("Switch a service off" below) and go on with every other service simulated, if
-the app can run without the switched-off service. If it cannot, name the blocker.
+covers (`needs_substitution`, `cannot_mock`). Follow the `cannot_mock` entry’s
+`code` and `next`. For a blocking gap, correct the declaration or build an
+adapter before onboarding again. Use the health check only when launch is
+allowed. Switch a service off only after the gap is confirmed
+and only if the app can run without it. Continue with the other services
+simulated. If it cannot run without the service, name the blocker.
 
 ## Switch a service off
 
@@ -503,6 +532,26 @@ Do this while the person chats. Do not ask for a yes.
 
 ## Health check
 
+- `driver_launch_in_enderis`: start the repository's own server or use
+  `launch.handler`. This check does not inspect `launch.compose` overrides.
+- `driver_listening_socket`: make the driver call the app instead of opening a
+  server; the app and a harness driver may listen.
+- `driver_imports_app`: call the app's front door from launched or attached
+  drivers; harness drivers may import it.
+- `onboarding_changed_customer_file`: the message names the baseline file;
+  delete that file if you made the change, or undo the edit if the coding agent
+  made it. Edits before the first onboard are not checked.
+
+During Enderis-launched runs, changes to JSON, YAML, TXT and other data,
+lockfiles, caches, databases, logs, build output and configuration are allowed,
+except source code, shell scripts, Markdown files, manifests (including
+`langgraph.json`, `Containerfile*` and `Procfile`) and nested repositories or
+submodules; file-name and extension exclusions ignore case.
+The check covers the onboarded package plus files directly at the repository
+root; an open baseline restarts on the next onboard after 24 hours.
+
+An unavailable Git check reports unknown and does not fail onboarding.
+
 After every change to `.enderis/`, the connections or the playground, run:
 
 ```sh
@@ -516,8 +565,8 @@ When the chat runs on a service channel (step 5), add the same `--channel` and
 It starts the agent once on its simulation, sends one short message through its
 front door and prints one result. Run it again after each fix until `ok` is
 `true`. A `null` never makes `ok` false: when every other entry is `true`, go
-on to the chat. For each entry in `checks` with `ok: false`, do what its
-`next` says:
+on to the chat. For each entry in `checks` with `ok: false`, follow its stable `code` and do
+what its `next` says:
 
 | `check` | Fix |
 | --- | --- |
@@ -548,7 +597,7 @@ in `declaration_errors`:
 ---
 target: python:agent                 # the package to onboard
 not_boundaries: [headers]            # inferred boundaries the code does not call
-model_keys: [OPENAI_API_KEY]         # the model keys the agent reads
+model_keys: [OPENAI_API_KEY]         # restrict the names that may pass
 boundaries:
   slack:                             # an inferred boundary with the wrong transport or URL
     declare: {transport: streamable_http, constructed_at: agent/mcp.py:40, url: https://mcp.slack.com/mcp}
@@ -562,8 +611,9 @@ boundaries:
 - `not_boundaries`: only boundaries with `basis: observed`. Read the code at
   `constructed_at` first: drop a boundary only when the code never connects
   to it.
-- `model_keys`: replaces the inferred list. Only model key names Enderis
-  passes are allowed (the error lists them).
+- `model_keys`: restricts which model keys may pass. Absent means every set
+  built-in key; `[]` passes none. Extra names need local operator approval
+  for every declared model host.
 - A `declare` block under an inferred boundary's id replaces it, after the
   checks in "Declare a boundary onboarding missed". Its gates are kept.
 - An `off:` entry named after an inferred boundary switches that service off
@@ -653,15 +703,43 @@ Kinds: `secret` (a token or key), `flag` (any non-empty value turns it on),
 again and check that `gates` now lists them. Simulated `secret` gates receive
 deterministic placeholders shaped for the service's credentials.
 
-A simulated `file` gate gets Enderis's fixed placeholder JSON, which a client
-that parses a real credential file (a service-account JSON, a token file) rejects.
+A simulated `file` gate gets fixed placeholder JSON unless `credential_files`
+names its shape. For a Google client, declare under that boundary:
+
+```yaml
+credential_files:
+  - env: GOOGLE_APPLICATION_CREDENTIALS
+    shape: google_service_account
+GOOGLE_APPLICATION_CREDENTIALS: file
+```
+
+Use `path: credentials/google.json` instead of `env` when the app opens that
+package-relative path. Enderis writes it only in the run copy. No copy means
+JSON diagnostic code `credential_file_requires_copy`; do not write or change
+the customer's file. Compose mapping gaps use `credential_file_compose_path`;
+unsafe paths and write failures use `credential_file`.
+Path files use `0600`; env assets use `0644` so a container uid can read them.
+Serial runs still get a copy and hold the repository lock. Paths in compose
+containers are not mapped; use an env file gate or a process launch. Env
+entries reuse the gate's generated assets file and need no copy. Check the
+printed declarations and `chat --check`'s `credential_file` entries.
+
+Shapes: `google_service_account` (a runtime-generated synthetic RSA key),
+`google_authorized_user` (a simulated token and fixed past expiry, so it
+refreshes through the token route), and `google_oauth_client` (client
+configuration, no interactive consent). Never put a real key or PEM in a
+fixture or ask the person to change customer code. A self-hosted API must
+upgrade to the credential-file reader release before installing this writer
+CLI; the CLI always advertises the capability.
 
 ## Declare a boundary onboarding missed
 
 Onboarding finds common MCP client patterns on its own: an inline server map,
 and a client or transport that names one server with a literal URL or command
-(the official `mcp` and `@modelcontextprotocol/sdk` transports and the
-framework clients built on them). It does not follow config objects or helper
+(the official `mcp` and `@modelcontextprotocol/sdk` transports, FastMCP URL-form
+`Client`, HTTP `StreamableHttpTransport` and `SSETransport`, and framework clients
+built on them). FastMCP config-map and stdio clients are listed as unresolved;
+declare each config server or the stdio command and arguments. It does not follow config objects or helper
 functions, so it can miss a client whose server comes from a config value. Do this when the JSON lists `unresolved_clients`, or when
 the code clearly builds an MCP client that is not in `boundaries`:
 
@@ -729,14 +807,15 @@ boundaries:
       package: "@acme/whatsapp-sdk"        # only when a vendor SDK builds it
       interface: whatsapp-cloud-http       # only when the origin picks no interface
     WHATSAPP_TOKEN: secret
-    WHATSAPP_BASE_URL: url                 # a config variable that holds the base URL
+    WHATSAPP_BASE_URL: url                 # only if required at startup, with no default
 ```
 
 - You decide where the client is built; the CLI checks only that `url` is an
   http(s) URL with no credentials, query or fragment (`origin`), that the
   `constructed_at` file exists, and that each gate variable is read
   (`gate_read`).
-- If the base URL comes from configuration, list that variable as a `url` gate.
+- List a base-URL variable as a `url` gate only when a required read has no
+  default and the app cannot start without it. Leave an optional override unset.
   A simulated run sets it to the simulation's route plus the path of `url`. So declare
   the full base URL the SDK uses, path included: for `slack_sdk` or
   `@slack/web-api`, `url: https://slack.com/api/`, not `https://slack.com`.

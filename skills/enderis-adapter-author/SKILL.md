@@ -54,7 +54,7 @@ named for the built-in, with no `behavior.py`:
 - For a REST client, `protocol="http"` and `upstream["endpoint"]` is the
   origin the client calls. Write one file per origin.
 - Take op names and their inputs from `enderis tools schemas <builtin> --json`.
-  Each `canonical` must name one of those ops.
+  Each `canonical` must name one of those ops or one of your extension ops below.
 - Each file must import on its own: do not import a sibling file.
 
 ```python
@@ -117,6 +117,24 @@ class CalendarRest:
             return http_response(400, {"error": {"code": 400, "message": got.error.message}})
         return got.result
 ```
+
+If the built-in holds the right records but lacks an operation, add optional
+`.enderis/services/<builtin>/operations.py` from `template/operations.py`.
+Export one stateless `Operations` class with ordinary `@op` methods taking
+`(self, ctx, store, args)`. Give each op a unique `x_`-prefixed name, then set
+`canonical="<builtin>.x_name"` and use `call.invoke` in the facade. Do not add
+`@service`, state declarations or seed hooks, or replace a base operation.
+The same `ctx` and `store` expose the built-in's state, principal, logical
+clock, effects and deliveries. No wall clock, RNG or mutable state on `self`.
+Built-in invariants do not check extension writes at run time; test those
+writes and refusals, including built-in → extension → built-in readback.
+Call extensions through facade tool names in tests, never `service.x_name`.
+Service-schema reads and authoring packets list only base operations.
+
+Each interface pins its own operations source in its adapter revision. Two
+adapters can carry different implementations of the same `x_` name. Runs
+combine the pinned adapter with the playground's pinned built-in version.
+After editing either file, import and reconnect; old runs keep their sources.
 
 Skip the service steps. Before importing, test each tool that writes: one
 case that calls it by its `@tool` name, with the arguments the route passes

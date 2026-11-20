@@ -2,7 +2,7 @@
 name: enderis-agent-driver
 description: >-
   Write an Enderis agent driver for an agent whose front door `enderis onboard`
-  cannot drive: triage the agent, write driver.md and driver.py from the
+  cannot drive: triage the agent, write driver.md and any needed code from the
   template into .enderis/driver/, check it, onboard, run one eval and read the
   run.
   Use when onboarding reports needs_ingress, needs_worker or no_agent_target,
@@ -12,11 +12,12 @@ description: >-
 
 # Writing an agent driver
 
-A driver is a small local program that carries each Enderis wake to the agent
-the way its real channel does and returns what the agent answered. It lives in
-`.enderis/driver/` in the agent repository: `driver.md` (the manifest) and the
-code it names. `.enderis/` belongs to Enderis and the agent never loads it, so
-adding it does not change the agent. Reference:
+A driver carries each Enderis wake to the agent the way its real channel does
+and returns what the agent answered. It lives in
+`.enderis/driver/` in the agent repository: `driver.md` (the manifest) and any
+code it names. Slack Events API apps need only the manifest; Enderis builds,
+signs and posts their events. `.enderis/` belongs to Enderis and the agent never
+loads it, so adding it does not change the agent. Reference:
 https://enderis.ai/docs/agents/drivers.
 
 The rule that decides everything: **never change the agent.** Not its code,
@@ -71,11 +72,9 @@ Answer these before writing code. Write the answers into the body of
    launch yet (an app that is not Node or Python). If the
    repository has no front door at all, only an agent object other code
    imports, use `app: harness` (section "A harness"). Never write a harness
-   when a front door exists. A serverless function (a Vercel `api/*.ts`, a
-   Next.js route handler, a Lambda handler) is a front door even when its
-   platform's dev server does not start without an account: write a small
-   server in `.enderis/driver/` that imports the exported handler unchanged
-   and serves it, and launch that server with `app: launched`.
+   when a front door exists. A serverless function is a front door: use
+   `launch.handler` below for Vercel or Lambda. Next.js keeps its own server
+   command. Never write a server or handler launcher under `.enderis/`.
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
@@ -106,7 +105,8 @@ Answer these before writing code. Write the answers into the body of
 
 ## 2. Write the driver
 
-Copy `template/http/` (`driver.md` and `driver.py`) to `.enderis/driver/` at
+For a Slack Events API app, copy `template/slack-events/driver.md` only and use
+the events declaration below. For other HTTP front doors, copy `template/http/` (`driver.md` and `driver.py`) to `.enderis/driver/` at
 the agent repository root (or in the agent's package, for a monorepo). It is
 the template onboarding names as `driver_template: http`, for an agent with an
 HTTP front door, such as a framework's own dev server (`reach: server`, with
@@ -205,16 +205,54 @@ What `launch` may start:
 - If the repository runs its own server (an entry point that listens, such as
   `app_oauth.py`), launch that entry point unchanged. Never write a server or
   wrapper around its app object.
-- A launcher under `.enderis/` is only for a repository with no server of its
-  own: a serverless handler the platform runs (Vercel, a Next.js route
-  handler, Lambda). It does only what the platform does: route each request
-  to the handler and keep `waitUntil` work alive. It never writes the app's
-  storage, never fakes sign-in or install state, and never calls framework
-  internals.
-- For a Slack OAuth app, `start` uses the app's own install and callback
-  routes (for example `/slack/install`, then `/slack/oauth_redirect`),
-  preserving the app's OAuth state and cookies. The exchange goes to the served
-  `oauth.v2.access`; the run principal must be a bot.
+- For an exported serverless handler, declare `launch.handler` below. Enderis
+  supplies the server in the run's temporary directory. A custom driver only
+  maps requests or performs supported setup through the app's own routes.
+- For a Slack OAuth app, a custom driver's `start` uses the app's own install
+  and callback routes (for example `/slack/install`, then
+  `/slack/oauth_redirect`), preserving the app's OAuth state and cookies. The
+  exchange goes to the served `oauth.v2.access`; the run principal must be a bot.
+
+### An exported handler
+
+For TS/JS Vercel functions, keep `command`, `front_door: production`,
+`app: launched` and `runtime: node`, and replace the process launch with:
+
+```yaml
+launch:
+  handler: {format: vercel}
+```
+
+Remove `port_env` and `ready`: Enderis owns both. It serves static `api/`
+routes (`api/foo.ts` and `api/foo/index.ts` both map to `/api/foo`) and detects
+Web method exports, default `{fetch}`, and Node `(req, res)` default exports.
+Files and folders starting with `_` or `.` are private and are not routed.
+Dynamic `[segment]` routes and Python Vercel files are reported as gaps.
+
+For Lambda, use `runtime: node` or `python` and
+`launch: {handler: {format: lambda, module: src/app.py, export: handler}}`.
+The module is a file inside the onboarded package, outside `.enderis/`;
+`export` defaults to `handler`. Input is API Gateway v2 / function URL format.
+Only results with `statusCode` are structured responses; strings are sent as-is
+and other objects are JSON with status 200. Python also loads imports from the
+module directory (SAM CodeUri layouts); a missing or non-callable export is a gap.
+TS uses the repository's `tsx` root entry (ESM and CJS hooks) when installed,
+else Node type stripping with `module.registerHooks`, plus
+extensionless import and tsconfig-path resolution. Explicit `.cjs`/`.cts`
+handlers also resolve extensionless `require` calls; unsupported cases stop
+with a gap. Enderis installs nothing. JSONC/extended tsconfig files need the
+repository's `typescript` or `tsx` package.
+
+Enderis waits for the response and registered background work, including nested
+`waitUntil` registrations, before accepting a wake. Rejection in an Enderis
+launcher is an agent failure; exceeding the wake budget is an agent timeout.
+Next.js keeps its own server and uses the same completion hooks; rejected
+`after()` tasks keep Next's error logging and are graded through their effects.
+Tracking starts only when `waitUntil` registers work; an unrelated open request
+does not hold the wake open. Late `waitUntil` calls log and are ignored.
+No driver-written completion endpoint is needed. Handler and events revisions
+need a v3 runner; current CLI runners advertise v3. Update an older runner
+that reports `needs_driver_runner`.
 
 ### A chat service front door
 
@@ -224,9 +262,9 @@ later through the service's API.
 
 - The person's message is already in the service: Enderis posted it as that
   person, because the eval (or the chat) starts on the service's channel.
-- The driver builds the platform's event from the wake's delivery (`entity`,
-  `thread`, `sender`, `data`) and sends it to the bot, signed as the platform
-  signs it.
+- For Slack Events API input, declare `events` below; Enderis builds, signs
+  and posts the event. Other chat platforms need a custom driver to map the
+  wake's delivery (`entity`, `thread`, `sender`, `data`) to their event.
 - Never post through the agent's route, and never read the service through it
   to look for the answer: each call shows on the run page as the agent's own
   action.
@@ -238,55 +276,64 @@ later through the service's API.
   stopped for 3 seconds. The wait ends by `ctx.request_timeout` after
   the wake was sent. When it runs out, the wake is accepted as it is and the
   eval grades it: staying silent can be right. A driver that already waits for
-  the work (the `/__settled` path below) does not need settle.
+  registered background work through Enderis's completion hooks needs no settle.
 
 ### A Slack Events API app
 
-A Slack bot's front door is its Events API route (often `/api/events`). The
-driver turns each wake into the request Slack would send. The bot answers
-through the Slack Web API, which the run simulates, so the driver returns no
-`replies` (section "A chat service front door").
+A Slack bot's front door is its Events API route (often `/api/events`). Declare
+it in `driver.md`; omit `command` and driver code:
 
-- The eval listens with `wake: full`, so each delivery carries `data`, the
-  message as the bot's own reads show it (`ts`, `channel`, `user`, `text`,
-  `thread_ts`, `subtype`). The kinds: `slack:mention:<bot>` (event
-  `slack.app_mention`), `slack:assistant:<user>` (`slack.assistant_thread_started`)
-  and `slack:dm:<user>` (`slack.message_delivered`, a DM message).
-- Build the event from `data`: `app_mention` and `message` (with
-  `channel_type: "im"`) copy `user`, `text`, `ts`, `channel`, `thread_ts` and
-  `subtype` when set, with `event_ts` equal to `ts`. `assistant_thread_started`
-  is `{"assistant_thread": {"user_id": user, "channel_id": channel,
-  "thread_ts": ts, "context": {}}, "event_ts": ts}`, where `channel` is the
-  DM. In Slack, `context.channel_id` is the channel the user was viewing when
-  they opened the pane, never the DM; a run has no such channel, so send
-  `context` empty.
-- Wrap it: `{"type": "event_callback", "token": "enderis", "team_id": team,
-  "api_app_id": app, "event_id": "Ev" + delivery["id"], "event_time":
-  int(float(ts)), "authorizations": [{"team_id": team, "user_id": bot,
-  "is_bot": true}], "event": event}`. Take `team`, `app` and `bot` (the bot's
-  user id in the seed) from the driver's `settings`. Every value then comes
-  from the run, so a replay sends the same body.
-- Sign it as Slack does. Declare the secret as a gate of the Slack boundary
-  in `.enderis/boundaries.md` (`SLACK_SIGNING_SECRET: secret`, see the
-  `enderis-onboard` skill); without it the app has no secret and throws on a
-  signed request. The app and the driver then get the same deterministic,
-  credential-shaped placeholder for it. Send
-  `X-Slack-Request-Timestamp: <now, in seconds>` and `X-Slack-Signature: v0=` +
-  hex HMAC-SHA256 of `v0:<timestamp>:<body>` with that secret. Wall time is
-  right here: the app compares it with its own clock, and Enderis does not
-  record these headers.
-- `waitUntil`: a Vercel function answers 200 at once and does its work in
-  `waitUntil(promise)` from `@vercel/functions`. Answer the wake only after
-  that work ends. Launch a small Node server from `.enderis/driver/` instead of
-  `vercel dev`: it imports the route's `POST` handler, sets
-  `globalThis[Symbol.for("@vercel/request-context")] = {get: () => ({waitUntil:
-  (p) => pending.push(p)})}` before it calls the handler, and answers a second
-  path (for example `/__settled`) once every promise in `pending` has settled.
-  The driver calls that path before it returns the wake. The bot's code is not
-  changed. A TypeScript handler whose imports have no file extension loads
-  only through a TypeScript loader: start the server with the repository's
-  own `tsx` (`node --import tsx server.mjs`) when it has one. Or return
-  `settle_timeout_s` instead of calling `/__settled`.
+```yaml
+front_door: production
+app: launched
+isolation: exclusive
+runtime: node
+launch: {handler: {format: vercel}}
+events:
+  platform: slack_events_v1
+  path: /api/events
+  signing_secret_env: SLACK_SIGNING_SECRET
+```
+
+Use the app's own process command for Next.js or a server, or `launch.handler`
+for Vercel or Lambda. Declare `SLACK_SIGNING_SECRET: secret` on exactly one
+simulated boundary in `.enderis/boundaries.md`. Do not put it in `settings` or
+`app_env`: Enderis gives the app and its poster the same deterministic, credential-shaped placeholder.
+The poster sends only to the declared loopback path and starts no driver process.
+
+Every listened channel must use `wake: full`: `slack:mention:<bot>`,
+`slack:dm:<person>` or `slack:assistant:<person>`. Seed one Slack team and one
+bot user whose id is the eval principal's single Slack handle. Missing or
+ambiguous identities are setup gaps, refused before a run starts. After route
+assignment, Enderis also refuses a signing secret with no single simulated owner.
+Do not put team, bot or app ids in driver settings.
+
+Enderis renders `app_mention`, `message` with `channel_type: im`, or
+`assistant_thread_started` from the recipient's record. It keeps message and
+thread timestamps and derives `event_id` from the delivery id. The app id is
+stable and matches `auth.test.api_app_id`.
+Assistant thread `context` is empty: a run has no channel the user was viewing.
+The unsigned body is part of the scrubbed wake. Enderis serializes it once and
+signs those exact bytes with the gate placeholder and a fresh wall-clock Slack
+timestamp. Signing headers never enter spans or evidence.
+
+The app answers through its own simulated Slack API calls. Enderis adds no
+synthetic replies. Handler launches wait for registered background work;
+server launches also use the existing bounded settle wait. Next tracks only
+completion; its own output keeps rejected `after()` errors. Rejected tasks in
+Enderis-owned Vercel and Lambda launchers are agent failures.
+
+No `url_verification` challenge is sent: runs deliver events directly, and Bolt's
+request verifier needs no challenge to start. The built-in poster has no custom
+`start` hook. For apps that need install setup, use the custom driver's `start`
+flow above through the app's own routes and the served `oauth.v2.access`.
+Do not fake install state or edit the app.
+
+#### Known gaps
+
+Bolt Python lazy listeners on a Lambda handler launch use boto3 to call
+`lambda.invoke`. That targets real AWS and Enderis refuses it, so those lazy
+listeners do not run.
 
 ### A Docker Compose app
 
@@ -347,10 +394,8 @@ For a repository with no front door: the driver imports the agent object and
 calls it, in its own process, with the agent's real code, prompt, tools and
 model. Copy `template/python-harness/` or `template/node-harness/` (the names
 onboarding prints as `driver_template`) to `.enderis/driver/`, then fill in
-`load_agent` and `ask`. `harness-frameworks.md` shows `ask` for LangGraph,
-LangChain, Deep Agents, the OpenAI Agents SDK, CrewAI, LlamaIndex, Strands,
-the Claude Agent SDK, pydantic-ai, the Vercel AI SDK, LangGraph.js and plain
-loops.
+`load_agent` and `ask`. Read [harness-frameworks.md](harness-frameworks.md)
+for the framework calls.
 
 ```markdown
 front_door: harness
@@ -382,6 +427,26 @@ app_env: [SITE_NAME]               # non-secret settings the agent needs
   covers).
 
 ## 3. Check, onboard, run
+
+- `driver_launch_in_enderis`: start the repository's own server or use
+  `launch.handler`. This check does not inspect `launch.compose` overrides.
+- `driver_listening_socket`: make the driver call the app instead of opening a
+  server; the app and a harness driver may listen.
+- `driver_imports_app`: call the app's front door from launched or attached
+  drivers; harness drivers may import it.
+- `onboarding_changed_customer_file`: the message names the baseline file;
+  delete that file if you made the change, or undo the edit if the coding agent
+  made it. Edits before the first onboard are not checked.
+
+During Enderis-launched runs, changes to JSON, YAML, TXT and other data,
+lockfiles, caches, databases, logs, build output and configuration are allowed,
+except source code, shell scripts, Markdown files, manifests (including
+`langgraph.json`, `Containerfile*` and `Procfile`) and nested repositories or
+submodules; file-name and extension exclusions ignore case.
+The check covers the onboarded package plus files directly at the repository
+root; an open baseline restarts on the next onboard after 24 hours.
+
+An unavailable Git check reports unknown and does not fail onboarding.
 
 ```sh
 enderis driver check .enderis/driver           # manifest, hash, describe; runs local code

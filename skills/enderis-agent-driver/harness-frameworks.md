@@ -7,21 +7,26 @@ conversation in `ctx.state`: the same process, and the same agent object,
 serve every wake of one run. Checked against the versions named; check the
 repository's own version before you copy.
 
+Use a harness when the agent has no front door Enderis can drive.
+
 ## Python (`template/python-harness/driver.py`)
 
 | Framework | `load_agent` returns | `ask` calls | Memory between wakes |
 |---|---|---|---|
-| LangGraph 1.x, no `langgraph.json` | the compiled graph | `graph.invoke({"messages": ...})` | the messages, in `ctx.state` |
-| LangChain 1.x `create_agent` | the agent (a compiled graph) | `agent.invoke({"messages": ...})` | the messages, in `ctx.state` |
-| LangChain `AgentExecutor` | the executor (`langchain_classic.agents`) | `executor.invoke({"input", "chat_history"})` | `chat_history`, in `ctx.state` |
-| Deep Agents `create_deep_agent` | the agent (a compiled graph) | `agent.invoke({"messages": ...})` | the messages, in `ctx.state` |
-| OpenAI Agents SDK 0.24 | the `Agent` | `Runner.run(agent, items)` | `result.to_input_list()` |
-| CrewAI 1.x | the `Crew` | `crew.kickoff(inputs=...)` | only through the crew's own inputs |
-| LlamaIndex 0.14 | the `FunctionAgent` or `AgentWorkflow` | `agent.run(text, ctx=...)` | a workflow `Context` |
-| Strands 1.x | the `Agent` | `agent(text)` | the agent object keeps it |
-| Claude Agent SDK 0.2 | the `ClaudeAgentOptions` | `ClaudeSDKClient.query` | one connected client |
+| LangGraph | the compiled graph | `graph.invoke({"messages": ...})` | the messages, in `ctx.state` |
+| LangChain create_agent | the agent (a compiled graph) | `agent.invoke({"messages": ...})` | the messages, in `ctx.state` |
+| LangChain AgentExecutor | the executor (`langchain_classic.agents`) | `executor.invoke({"input", "chat_history"})` | `chat_history`, in `ctx.state` |
+| Deep Agents | the agent (a compiled graph) | `agent.invoke({"messages": ...})` | the messages, in `ctx.state` |
+| OpenAI Agents SDK | the `Agent` | `Runner.run(agent, items)` | `result.to_input_list()` |
+| CrewAI | the `Crew` | `crew.kickoff(inputs=...)` | only through the crew's own inputs |
+| LlamaIndex | the `FunctionAgent` or `AgentWorkflow` | `agent.run(text, ctx=...)` | a workflow `Context` |
+| Strands | the `Agent` | `agent(text)` | the agent object keeps it |
+| Claude Agent SDK | the `ClaudeAgentOptions` | `ClaudeSDKClient.query` | one connected client |
 | pydantic-ai | the `Agent` | `agent.run_sync(text, message_history=...)` | `result.all_messages()` |
-| No framework | the repository's loop function | `respond(messages)` | the messages, in `ctx.state` |
+| Custom loop | the repository's loop function | `respond(messages)` | the messages, in `ctx.state` |
+
+Use a LangGraph harness when there is no `langgraph.json`; otherwise use the
+standard driver.
 
 **LangGraph** (langgraph 1.2). If the graph has a checkpointer, pass only the new
 message and `{"configurable": {"thread_id": ctx.run_id}}` instead. A graph with
@@ -145,12 +150,15 @@ def ask(respond, ctx, text):
 
 | Framework | `loadAgent` returns | `ask` calls | Memory between wakes |
 |---|---|---|---|
-| Vercel AI SDK 7, no chat route | the `ToolLoopAgent` | `agent.generate({ messages })` | `result.response.messages` |
-| LangGraph.js 1.x, no server | the compiled graph | `graph.invoke({ messages })` | the messages, in `ctx.state` |
-| langchain 1.x `createAgent` | the agent | `agent.invoke({ messages })` | the messages, in `ctx.state` |
-| OpenAI Agents JS 0.22 | the `Agent` | `run(agent, input)` | `result.history` |
-| Claude Agent SDK TS 0.3 | the `query` options | `query({ prompt, options })` | `resume` with the session id |
+| Vercel AI SDK | the `ToolLoopAgent` | `agent.generate({ messages })` | `result.response.messages` |
+| LangGraph.js | the compiled graph | `graph.invoke({ messages })` | the messages, in `ctx.state` |
+| LangChain.js | the agent | `agent.invoke({ messages })` | the messages, in `ctx.state` |
+| OpenAI Agents JS | the `Agent` | `run(agent, input)` | `result.history` |
+| Claude Agent SDK TS | the `query` options | `query({ prompt, options })` | `resume` with the session id |
 | Custom loop | the repository's loop function | `respond(messages)` | the messages, in `ctx.state` |
+
+Use a Vercel AI SDK harness when there is no chat route, and a LangGraph.js
+harness when there is no server; otherwise use the standard driver.
 
 **Vercel AI SDK** (ai 7). For an app that wraps `generateText` in its own
 function instead, call that function with the same `messages`.
@@ -178,8 +186,8 @@ async function ask(graph, ctx, text) {
 }
 ```
 
-**langchain `createAgent`** (langchain 1.6): the same as LangGraph.js, with
-`agent.invoke`.
+**LangChain.js** (langchain 1.6): `createAgent` uses the same calls as
+LangGraph.js, with `agent.invoke`.
 
 **OpenAI Agents JS** (@openai/agents 0.22).
 
