@@ -92,9 +92,10 @@ text. An imported file is never rewritten for you: fix the lines in your files.
 **Trigger on the agent's front door.** For an agent whose front door is a chat
 service, such as a Slack bot, post on that service instead of `trigger: chat`:
 for a Slack DM, `listens: [slack:dm:<sender>]` and `trigger: {kind: message,
-from: <sender>, channel: slack:dm:<principal>}`. For an agent run through a
-driver, listen with `{channel: slack:dm:<sender>, wake: full}` so its wake carries
-the message record.
+from: <sender>, channel: slack:dm:<principal>}`. Drivers that read `text` (the
+harness and HTTP chat templates, plus the standard AI SDK, LangGraph, Mastra
+and ADK drivers) need `wake: text` on a channel that has message bodies;
+use `wake: full` only when the driver reads `data` or Slack `platform_event`.
 
 **The trigger is a natural opener.** It is delivered verbatim. A real person
 states a problem in their own words and does not recite ids, emails or exact

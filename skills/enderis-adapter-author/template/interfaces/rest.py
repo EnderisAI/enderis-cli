@@ -4,6 +4,12 @@ Each `@tool` serves one real route: its method and path, and the reply the
 real API sends. `upstream["endpoint"]` is the API's production origin; a run
 sends the agent's requests to that origin here instead. Path parameters,
 query parameters and a JSON or form body become `call.args`.
+
+List extra bootstrap and auth origins in `upstream["auth_origins"]`
+as a space-separated string and serve their routes in this interface.
+A client that only checks an extra origin's status can use a `route=("GET", "/")`
+tool returning `http_response(200, raw="")`.
+An interface cannot set cookies, so report a client that needs a bootstrap cookie as a gap.
 """
 
 from enderis.interface import http_response, interface, tool

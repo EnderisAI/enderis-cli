@@ -7,11 +7,13 @@ app: harness
 isolation: exclusive
 runtime: node
 ---
-Why a harness: the repository has no front door a driver can use (no HTTP
-server, chat route or webhook). TODO: say what you looked for.
+Why a harness: no front door can be launched or driven. TODO: name the front
+door this stands in for, if any (terminal CLI, console script or unsupported
+serverless platform), and keep its prompt, tools, model and settings.
 
 What the driver calls: TODO, for example the `agent` exported by
 `src/agent.js`, given the conversation so far for each delivery.
+This template reads delivery text: listen with wake: text on a channel that has message bodies.
 
 Toolchain: the repository's own `node`, started as `node` so Enderis loads
 `@enderis/driver` first. A TypeScript agent needs its compiled output, or a

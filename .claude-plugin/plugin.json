@@ -1,6 +1,6 @@
 {
   "name": "enderis",
-  "version": "2026.1120.1041",
+  "version": "2026.1121.1025",
   "description": "Skills for the Enderis CLI: onboard an agent, write its driver, author evals and playgrounds.",
   "author": {
     "name": "Enderis"

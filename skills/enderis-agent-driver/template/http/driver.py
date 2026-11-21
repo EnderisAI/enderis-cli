@@ -42,6 +42,10 @@ class Driver:
         self.ack(ctx)
         chats = {}
         for delivery in wake.get("deliveries", []):
+            if delivery.get("text") is None:
+                raise AgentError(
+                    "this wake has no text; listen with `wake: text` on a channel that has message bodies"
+                )
             # Everything sent to the shared app is scoped to this run.
             chat = f"{ctx.run_id}:{delivery['conversation']}"
             chats[chat] = delivery
@@ -53,7 +57,7 @@ class Driver:
                 {
                     "chat_id": chat,
                     "from": delivery["sender"]["handle"],
-                    "text": delivery.get("text"),
+                    "text": delivery["text"],
                 },
             )
         # This template always drains. With wake["waiting"] > 0 a driver may

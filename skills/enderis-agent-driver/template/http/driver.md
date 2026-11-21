@@ -29,3 +29,4 @@ What the driver maps: each delivery goes to POST /inbox under a chat id made
 from the run id and the conversation. Answers come from GET /outbox. A message
 with `handoff: true` is an escalation. POST /outbox/ack acknowledges, by message
 id, only what Enderis accepted.
+This template reads delivery text: listen with wake: text on a channel that has message bodies.

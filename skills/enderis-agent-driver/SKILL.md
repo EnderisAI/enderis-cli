@@ -40,8 +40,8 @@ add symlinks, copies or launchers to move them.
 
 A driver is for a front door onboarding cannot drive. If the front door works
 but onboarding missed some of the agent's MCP clients, do not write a driver:
-declare those boundaries as the `enderis-onboard` skill describes ("Declare a
-boundary onboarding missed").
+declare those boundaries as the `enderis-onboard` skill describes in
+"2. Declare what the code actually does".
 
 ## 1. Triage
 
@@ -58,9 +58,11 @@ Answer these before writing code. Write the answers into the body of
    arrives as a webhook that starts a workflow: drive the webhook, signed the
    way the app checks it. A step that waits for a person, such as an approval,
    is part of the job: send that person's answer the way the app's approval
-   route takes it. Any secret the app checks (a webhook signing secret, an
-   approval secret) is one the driver makes for the run and sets in the app's
-   environment; that is not a real credential.
+   route takes it. Any secret the app checks (a webhook or approval secret,
+   JWT verification key or JWKS, or API bearer token) is made by the driver for
+   the run and set in the app's environment, not supplied by the owner.
+   For JWTs, make a throwaway key pair, set the verification key and sign the
+   driver's requests with the private key.
 3. **Start.** How does the app start without edits? Find the existing script
    or command and the environment it reads. Use `app: launched` when you can:
    Enderis starts the app for each run with the run's simulated services and
@@ -70,18 +72,19 @@ Answer these before writing code. Write the answers into the body of
    `app: managed` (the driver's `start` and `stop` hooks start one copy per run
    slot) only for an app that calls no outside service, or one Enderis cannot
    launch yet (an app that is not Node or Python). If the
-   repository has no front door at all, only an agent object other code
-   imports, use `app: harness` (section "A harness"). Never write a harness
-   when a front door exists. A serverless function is a front door: use
-   `launch.handler` below for Vercel or Lambda. Next.js keeps its own server
+   repository has no front door Enderis can launch or drive, use `app: harness`
+   (section "A harness"), including when the only entry point is a terminal CLI,
+   console script or serverless platform other than Vercel/Lambda.
+   Use `launch.handler` below for Vercel or Lambda. Next.js keeps its own server
    command. Never write a server or handler launcher under `.enderis/`.
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
    scheduler? If it has its own clock, find how to make it run now (a tick
    endpoint, a debug flag, a short interval set by environment).
 5. **Isolation.** For `app: launched` or a harness, keep `isolation: exclusive`;
-   it changes nothing: each run starts its own app in its own copy of the
-   repository folder, so runs overlap and an open `enderis chat` never makes an
-   `enderis run` wait. An app that ignores the port Enderis gives it goes one
+   it changes nothing: each run starts its own app, in its own copy of the
+   repository folder when Enderis can make one, so runs overlap and an open
+   `enderis chat` never makes an `enderis run` wait. When the copy fails, the
+   run uses the folder itself, one run at a time. An app that ignores the port Enderis gives it goes one
    run at a time on its own. For `app: attached`, the default
    `isolation: exclusive` means one run at a time uses the app. Use
    `isolation: namespace` only when each run gets its own
@@ -120,6 +123,7 @@ directory only if the owner asks; then pass `--driver <dir>` to
   file the driver needs). Set `app: launched` (section "A launched app") or
   `app: attached` as triage item 3 says, and keep `isolation: exclusive`;
   change to `namespace` only when triage item 5 allows it.
+- Optional `timeout:` is seconds per wake answer: default 300, allowed 1..=3600; use 600 for a ten-minute agent, then onboard again. It sets `ctx.request_timeout` and the driver, HTTP and settle budgets.
 - For `app: managed`, add `start` and `stop` (lists that run in the driver
   directory; list their scripts in `files`). `start` exits 0 only when the copy
   is ready; `stop` removes the copy and succeeds when there is nothing to stop.
@@ -136,7 +140,11 @@ directory only if the owner asks; then pass `--driver <dir>` to
   - when `wake["waiting"]` is above zero, the driver may hold back the app's
     output (its clock stays paused) and return it on a later wake; when it is
     zero, it must drain everything before it answers;
-  - replies name the delivery they answer (`reply(delivery["id"], text)`);
+  - replies name the delivery they answer (`reply(delivery["id"], text)`); each
+    reply must contain non-whitespace text and may be up to 200,000 characters,
+    and one answer's replies together at most 6 MiB as JSON.
+    Stored messages and evaluator evidence keep it whole; a destination service
+    may have its own smaller limit;
   - escalations name the channel (`escalate(wake["channel"], reason)`);
   - the app's outbox is acknowledged, by message id, only for wakes up to
     `ctx.accepted_through`;
@@ -171,7 +179,9 @@ app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
 - If the nearest `package.json` sets `engines.node`, Enderis checks the app's
   Node before it starts the app: the `node` first on `PATH` when `launch`
   starts with `node`, `npm`, `npx`, `pnpm` or `yarn`, or the binary when it
-  starts with an absolute path to `node`. On a mismatch the run stops. Put a
+  starts with an absolute path to `node`, run with the app's empty `HOME`. A
+  package script that starts bun or deno is not checked. On a mismatch the run
+  stops. Put a
   matching Node first on `PATH`, or start `launch` with the absolute path of a
   matching `node`; do not edit the range.
 - Port: find where the app reads its port. If it reads a variable, set
@@ -250,6 +260,8 @@ Next.js keeps its own server and uses the same completion hooks; rejected
 `after()` tasks keep Next's error logging and are graded through their effects.
 Tracking starts only when `waitUntil` registers work; an unrelated open request
 does not hold the wake open. Late `waitUntil` calls log and are ignored.
+The Node request context supplies incoming headers for framework tracing;
+`waitUntil` accepts promises and callbacks returning promises.
 No driver-written completion endpoint is needed. Handler and events revisions
 need a v3 runner; current CLI runners advertise v3. Update an older runner
 that reports `needs_driver_runner`.
@@ -302,7 +314,9 @@ simulated boundary in `.enderis/boundaries.md`. Do not put it in `settings` or
 The poster sends only to the declared loopback path and starts no driver process.
 
 Every listened channel must use `wake: full`: `slack:mention:<bot>`,
-`slack:dm:<person>` or `slack:assistant:<person>`. Seed one Slack team and one
+`slack:dm:<person>` or `slack:assistant:<person>`. A DM from any other cast
+member reaches the bot as a full `message` event without a `listens` entry.
+Seed one Slack team and one
 bot user whose id is the eval principal's single Slack handle. Missing or
 ambiguous identities are setup gaps, refused before a run starts. After route
 assignment, Enderis also refuses a signing secret with no single simulated owner.
@@ -319,7 +333,7 @@ timestamp. Signing headers never enter spans or evidence.
 
 The app answers through its own simulated Slack API calls. Enderis adds no
 synthetic replies. Handler launches wait for registered background work;
-server launches also use the existing bounded settle wait. Next tracks only
+server launches settle for up to `timeout:` (default 300 s). Next tracks only
 completion; its own output keeps rejected `after()` errors. Rejected tasks in
 Enderis-owned Vercel and Lambda launchers are agent failures.
 
@@ -384,15 +398,20 @@ ready: /healthz
   host`. Do not edit the customer's compose files. Write a compose file for
   runs in `.enderis/` without these and list it in `files`. Paths in a compose
   file are relative to the folder of the first file.
-- The machine that runs the evals needs Docker with Compose 2.24 or later,
-  with the engine on that machine (on Linux, not Docker Desktop's VM or a
-  remote engine).
+- The machine that runs the evals needs Docker with Compose 2.24 or later.
+  macOS and Windows use Docker Desktop on that machine. Linux needs a local
+  Docker Engine; Docker Desktop for Linux and remote engines are unsupported.
+  Enderis connects containers back to this machine. Do not change the agent
+  or driver to allow `host.docker.internal`.
+  Under deny, a container reaches host loopback only at this run's own listeners
+  or an explicitly allowed destination.
 
 ### A harness
 
-For a repository with no front door: the driver imports the agent object and
-calls it, in its own process, with the agent's real code, prompt, tools and
-model. Copy `template/python-harness/` or `template/node-harness/` (the names
+When no front door can be launched or driven, the harness calls the same function
+or agent object the front door calls, with the same prompt, tools, model and
+settings; name the front door it stands in for in `driver.md` and the report.
+Copy `template/python-harness/` or `template/node-harness/` (the names
 onboarding prints as `driver_template`) to `.enderis/driver/`, then fill in
 `load_agent` and `ask`. Read [harness-frameworks.md](harness-frameworks.md)
 for the framework calls.
@@ -434,17 +453,21 @@ app_env: [SITE_NAME]               # non-secret settings the agent needs
   server; the app and a harness driver may listen.
 - `driver_imports_app`: call the app's front door from launched or attached
   drivers; harness drivers may import it.
-- `onboarding_changed_customer_file`: the message names the baseline file;
-  delete that file if you made the change, or undo the edit if the coding agent
-  made it. Edits before the first onboard are not checked.
+- `onboarding_changed_customer_file`: undo the change. Only the repository
+  owner may keep an edit they made: they delete the baseline file the message
+  names and onboard again. Edits before the first onboard are not checked.
+- `onboarding_baseline_missing` (unknown): there is no baseline, and a passing
+  check never starts one. Only the repository owner onboards again to start it.
 
-During Enderis-launched runs, changes to JSON, YAML, TXT and other data,
+During Enderis-launched runs in the repository folder itself (no run copy),
+changes to JSON, YAML, TXT and other data,
 lockfiles, caches, databases, logs, build output and configuration are allowed,
 except source code, shell scripts, Markdown files, manifests (including
 `langgraph.json`, `Containerfile*` and `Procfile`) and nested repositories or
 submodules; file-name and extension exclusions ignore case.
 The check covers the onboarded package plus files directly at the repository
-root; an open baseline restarts on the next onboard after 24 hours.
+root. An open baseline older than 24 hours reports unknown
+(`onboarding_baseline_expired`); onboard again to recheck.
 
 An unavailable Git check reports unknown and does not fail onboarding.
 
@@ -472,7 +495,8 @@ Open the printed run link.
 - **Front door and app:** check they say what the driver really does.
 - **Failures:** an agent failure or agent timeout is the app's side (down,
   error, slow). An Enderis error at the driver is the driver's side (crash,
-  a bad result, a deadline missed by the driver). `AgentTimeout` raised in
+  a bad result, an unanswered call other than a wake). A missed wake deadline is
+  an agent failure; set `timeout:` if the agent normally takes longer. `AgentTimeout` raised in
   `start` is an Enderis error too: the app never started, so the run is not
   graded. Read the stop log for output the driver held but could not deliver.
 

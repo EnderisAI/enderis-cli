@@ -36,9 +36,12 @@ serve({
   async wake(ctx, wake) {
     const replies = [];
     for (const delivery of wake.deliveries ?? []) {
+      if (delivery.text == null) {
+        throw new AgentError("this wake has no text; listen with `wake: text` on a channel that has message bodies");
+      }
       let answer;
       try {
-        answer = await ask(agent, ctx, delivery.text ?? "");
+        answer = await ask(agent, ctx, delivery.text);
       } catch (error) {
         if (error instanceof AgentError) throw error;
         throw new AgentError(`the agent failed: ${error?.message ?? error}`);

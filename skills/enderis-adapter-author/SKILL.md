@@ -28,7 +28,8 @@ files does not change the agent. Never edit the agent's code, config or
 scripts.
 
 A REST API the person will use only as a live read needs no adapter: declare
-it without `interface:` (the `enderis-onboard` skill, "REST boundaries").
+it without `interface:` (the `enderis-onboard` skill, "3. Connect boundaries and
+check onboarding again").
 
 `template/` in this skill folder (installed at
 `~/.agents/skills/enderis-adapter-author/template/`) is a complete adapter
@@ -108,8 +109,10 @@ class CalendarRest:
               "start": {"type": "object"}, "end": {"type": "object"}}}})
     def insert_event(self, call):
         start, end = call.args["start"], call.args["end"]
+        # A timed event has `dateTime`; an all-day event has `date` instead.
         args = {"calendarId": call.args["calendarId"], "summary": call.args.get("summary", ""),
-                "start": start["dateTime"], "end": end["dateTime"]}
+                "start": start.get("dateTime", start.get("date")),
+                "end": end.get("dateTime", end.get("date"))}
         if "timeZone" in start:
             args["timeZone"] = start["timeZone"]
         got = call.invoke("google_workspace.create_event", args)
@@ -348,6 +351,15 @@ A returned value is a 200 JSON reply; `http_response(status, body)` sends
 another status. A GraphQL API is one `POST` route (for example `/graphql`)
 whose tool reads `call.args["query"]` and `call.args["variables"]`. Full
 route rules: https://enderis.ai/docs/cli/import#custom-tools.
+
+For a simulated HTTP boundary, list extra bootstrap and auth origins
+in `upstream["auth_origins"]` as a space-separated string and serve their routes
+in this interface; boundary `hosts` is only for passthrough.
+Runs simulate only the auth origins recorded at onboarding, so run
+`enderis onboard .` again after you change them.
+A client that only checks an extra origin's status can use a matching
+`route=("GET", "/")` tool returning `http_response(200, raw="")`.
+An interface cannot set cookies, so report a client that needs a bootstrap cookie as a gap.
 
 ## 3. Test the service
 

@@ -45,8 +45,12 @@ class Harness:
     def wake(self, ctx, wake):
         result = WakeResult()
         for delivery in wake.get("deliveries", []):
+            if delivery.get("text") is None:
+                raise AgentError(
+                    "this wake has no text; listen with `wake: text` on a channel that has message bodies"
+                )
             try:
-                answer = ask(self.agent, ctx, delivery.get("text") or "")
+                answer = ask(self.agent, ctx, delivery["text"])
             except AgentError:
                 raise
             except Exception as exc:  # noqa: BLE001 - the agent's own failure

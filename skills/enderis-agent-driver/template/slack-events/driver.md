@@ -14,7 +14,7 @@ events:
 Use the app's actual event path. For Next.js or another server, replace launch
 with its own process command; for Lambda, use its module and export.
 
-Declare SLACK_SIGNING_SECRET as a secret gate on exactly one mocked boundary in
+Declare SLACK_SIGNING_SECRET as a secret gate on exactly one simulated boundary in
 .enderis/boundaries.md. Use wake: full for each listened Slack mention, DM or
 assistant channel. Seed one Slack team and a bot user matching the eval
 principal's single Slack handle. Enderis supplies the app and event ids.
