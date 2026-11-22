@@ -267,3 +267,9 @@ Report: chat link; defaults taken; connection choices and adapters built;
 switched-off services, reasons and lost coverage; eval names; live run link and verdict.
 For failure, name whether the eval, agent, machine or Enderis is at fault, with run evidence.
 Name any remaining blocker and what is already complete.
+
+Then keep listening: run `enderis feedback --wait`. In the web app the person
+marks replies, checks and evals as good or wrong and sends the notes to you.
+Act on each batch as the `enderis-eval-author` skill says ("Feedback from the
+web app"), close each note, and wait again. Tell the person once that they can
+do this.

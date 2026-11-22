@@ -70,8 +70,8 @@ you label them as simulated.
    - with a signed-in CLI (`enderis auth login` first), in a new empty folder
      run `git init`, `mkdir evals` and
      `enderis pull --agent <starter agent name>`. Pull writes the starter's
-     playground to `playgrounds/<name>/blueprint.yaml`, and its evals beside
-     it.
+     playground to `playgrounds/<name>/blueprint.yaml`, its evals beside it,
+     and the agent itself to `agents/<name>.md`.
 4. **Research, and save what you find.** Save each source pass as a dated data
    file, for example `research/catalog_2026-09-10.json`. Each fact carries the
    URL it came from and the date you checked it.
