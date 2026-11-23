@@ -73,6 +73,11 @@ Set up a 30-minute meeting with Alice on Thursday and send her the invite.
 `@eval`: then it is shared and grades every eval that points at it. A file with several
 `@eval`s errors when none matches.
 
+**The name is a short phrase that says what is tested**, in plain words a
+reader understands at a glance: `book_with_right_alice`, `refund_needs_receipt`.
+Never a code name, prefix or number (`bo_refund_2`, `s1`, `s10`): owners see the
+name in every list and on every run.
+
 **The description is labelled lines in a fixed order**, as above: Ask, Why it's
 hard (omit if nothing lures the agent), Deciding rule, Right answer, Fails if.
 Every fact comes from the seed or the evaluator; anything the evaluator does not
@@ -387,6 +392,7 @@ which happened.
 enderis run . --list                          # from the onboarded agent's repo
 enderis run . --eval book_with_right_alice    # add --reps 5 for repeats
 enderis run --agent <hosted agent> --eval book_with_right_alice --provider scripted   # a hosted agent's self-test
+enderis runs list --agent <agent> --eval book_with_right_alice   # earlier runs and their ids (MCP: list_runs)
 ```
 
 Open the printed run link and read **Assertions** first: one row per assertion,
