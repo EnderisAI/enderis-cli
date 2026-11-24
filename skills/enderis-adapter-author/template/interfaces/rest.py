@@ -9,7 +9,9 @@ List extra bootstrap and auth origins in `upstream["auth_origins"]`
 as a space-separated string and serve their routes in this interface.
 A client that only checks an extra origin's status can use a `route=("GET", "/")`
 tool returning `http_response(200, raw="")`.
-An interface cannot set cookies, so report a client that needs a bootstrap cookie as a gap.
+A client that needs a bootstrap cookie gets it from
+`http_response(..., cookies=["sid=s1; Domain=.example.com; Path=/"])`;
+list "Cookie" in `http_headers` to read it back as the `cookie` argument.
 """
 
 from enderis.interface import http_response, interface, tool

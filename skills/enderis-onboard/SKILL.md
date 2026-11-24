@@ -18,6 +18,11 @@ Use the CLI throughout; do not set up MCP or restart the session.
 - Customer code is read-only. Write only under `.enderis/`; never change the
   agent's code, config, scripts or prompts, including through launch patches.
   Never write a launcher under `.enderis/` (`driver_launch_in_enderis`).
+- Never copy one model key into another key name: not in a driver, a launch
+  command or an override file (`driver_reads_model_key`). Never put a model key
+  under `app_env:` or `settings:` (`model_key_copied`). When the agent reads
+  its key under another name, such as `LLM_API_KEY`, declare it under
+  `model_keys:` and have the person approve it with `enderis model-keys`.
 - When a run reports the agent changed since its baseline, undo your own edit.
   Never delete the baseline file; only the person may.
 - Find the agent's main job and how production reaches it. Use that front
@@ -53,14 +58,23 @@ Keep the context if connected to the requested workspace. Otherwise run the
 person's exact sign-in command, or use:
 
 ```sh
-mkdir -p .enderis
-enderis auth login --no-browser --workspace <org>/<workspace> > .enderis/login.log 2>&1 &
+enderis auth login --no-browser --workspace <org>/<workspace>
 ```
 
-Never guess the org or workspace; omit `--workspace` if none was named and let
-the person choose. Give them the printed approval URL and code together.
-Continue reading code while login waits. Poll the log within the turn until
-connected or the ten-minute login expires; leave approval to the person.
+In your shell it prints the link and code and exits at once. Your next
+message gives the person the link and the code, before anything else: the
+code expires in ten minutes. Never guess the org or workspace; omit
+`--workspace` if none was named and let the person choose. Then start the
+`--wait` command it printed, in the background:
+
+```sh
+mkdir -p .enderis
+enderis auth login <the flags on that line> --wait > .enderis/login.log 2>&1 &
+```
+
+Continue reading code while it waits. Poll the log within the turn until
+connected; if it says expired or denied, sign in again from the start and
+give the new link and code at once. Leave approval to the person.
 If `enderis` is not on PATH, try `~/.local/bin/enderis`.
 Contexts and credentials are user-local; repository files cannot select them.
 
@@ -96,7 +110,7 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
   string in the interface's `upstream.auth_origins` and serve their routes there.
   Onboarding records them; onboard again after changing them, or runs refuse.
   After the first run, read `blocked_egress` warnings for missing hosts of declared boundaries.
-  An interface cannot set cookies, so report a client that needs a bootstrap cookie as a gap.
+  For a client that needs a bootstrap cookie, return it with `http_response(..., cookies=[...])` and give it the production `Domain` (such as `Domain=.example.com`), so the client sends it to the other origins too; list `Cookie` in `http_headers` to read it back as the `cookie` argument. The agent's cookies reach only an interface that lists `Cookie`, and a listed `Cookie` is recorded in the run like any other argument.
 - A `declare:` block replaces a wrong inferred transport or target under the
   same id. For known MCP clients, cite the constructor as `constructed_at: path:line`
   and its literal `server` or `url`; follow declaration errors to correct it.
@@ -124,7 +138,7 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
   Never list model keys, boundary gates, port or reserved variables as settings.
 
 Raw sockets and clients bypassing hooks and proxies may reach production; report this limit.
-`unobserved_connections` reports only observations. Never claim containment or change customer code.
+`unobserved_connections` reports only observations; `browser: true` marks an agent's own web browser, which Enderis neither simulates nor blocks, even under deny (allowed for reading only). Never claim containment or change customer code.
 
 For `needs_ingress`, `needs_worker` or `no_agent_target` when an app exists, use
 `enderis-agent-driver` to write, check and onboard `.enderis/driver/`; return

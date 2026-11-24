@@ -320,7 +320,7 @@ fields. Do not supply a different name, schema or annotations alongside it.
 ### A REST API
 
 Use this for a client built on `fetch`, `node:http` (axios, got), `httpx`,
-`requests`, `urllib`, `aiohttp`, a GraphQL client or a vendor SDK. The interface has `protocol="http"`, and
+`requests`, `urllib`, `aiohttp`, `curl_cffi`, a GraphQL client or a vendor SDK. The interface has `protocol="http"`, and
 `upstream["endpoint"]` is the origin the client calls (scheme, host and port
 only). Each tool serves one route; path parameters, query parameters and a
 JSON or form body become `call.args`:
@@ -359,7 +359,12 @@ Runs simulate only the auth origins recorded at onboarding, so run
 `enderis onboard .` again after you change them.
 A client that only checks an extra origin's status can use a matching
 `route=("GET", "/")` tool returning `http_response(200, raw="")`.
-An interface cannot set cookies, so report a client that needs a bootstrap cookie as a gap.
+For a client that needs a bootstrap cookie, return it with
+`http_response(..., cookies=[...])` and give it the production `Domain`
+(such as `Domain=.example.com`), so the client sends it to the other origins too.
+List `Cookie` in `http_headers` to read it back as the `cookie` argument;
+only then does the agent's `Cookie` reach the interface, and it is recorded
+like any other argument.
 
 ## 3. Test the service
 

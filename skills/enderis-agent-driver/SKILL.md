@@ -453,6 +453,17 @@ app_env: [SITE_NAME]               # non-secret settings the agent needs
   server; the app and a harness driver may listen.
 - `driver_imports_app`: call the app's front door from launched or attached
   drivers; harness drivers may import it.
+- `driver_reads_model_key`: do not read, set or copy a model key (a built-in
+  one or one listed under `model_keys:`) where the app's process would get it:
+  a harness driver's code or `command`, a launched app's `launch.process`, a
+  `.env` in the driver folder, or a compose override under `.enderis/`.
+  Enderis gives model keys to the app only under their own names. When the
+  app reads its key under another name, such as `LLM_API_KEY`, list that name
+  under `model_keys:` in `.enderis/boundaries.md`, have the runner operator
+  approve it with `enderis model-keys <NAME> --host <HOST>`, and onboard again.
+- `model_key_copied`: a run stops when an `app_env:` or `settings:` value is
+  the value of a model key. Never put a model key under `app_env:` or
+  `settings:`; declare it under `model_keys:`.
 - `onboarding_changed_customer_file`: undo the change. Only the repository
   owner may keep an edit they made: they delete the baseline file the message
   names and onboard again. Edits before the first onboard are not checked.
@@ -496,7 +507,9 @@ Open the printed run link.
 - **Failures:** an agent failure or agent timeout is the app's side (down,
   error, slow). An Enderis error at the driver is the driver's side (crash,
   a bad result, an unanswered call other than a wake). A missed wake deadline is
-  an agent failure; set `timeout:` if the agent normally takes longer. `AgentTimeout` raised in
+  an agent failure when some run of the agent has answered a wake through this
+  driver; otherwise (a new or changed driver) the run has no verdict, because the
+  driver may be the stuck part. Set `timeout:` if the agent normally takes longer. `AgentTimeout` raised in
   `start` is an Enderis error too: the app never started, so the run is not
   graded. Read the stop log for output the driver held but could not deliver.
 

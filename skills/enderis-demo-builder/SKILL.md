@@ -145,31 +145,34 @@ done.
    `enderis auth status --workspace <org>/<workspace>`, using the workspace
    the request names (its id or `org/workspace`). When it prints
    `Status: connected`, go on. Otherwise, if the request gives a sign-in
-   command, run exactly that command in the background (add
-   `> login.log 2>&1 &` if it lacks it); else:
+   command, run exactly that command in the foreground; else:
 
    ```sh
-   enderis auth login --no-browser --workspace <org>/<workspace> > login.log 2>&1 &
+   enderis auth login --no-browser --workspace <org>/<workspace>
    ```
 
-   Within a few seconds `login.log` has the lines `Login code: <code>` and
-   `Open <link> and type the code there.` Give the user both, and tell them
-   to open the link, type the code, choose the workspace if the page asks,
-   and approve.
-   The code works for 10 minutes. Do not end your turn to wait: go on with
-   the steps that do not need sign-in (intake, research, the brief, the
-   playground and agent files). When only signed-in steps remain, wait
-   inside this turn: read `login.log` every 10 seconds, for up to 10
-   minutes, until it ends with `Connected to <org>/<workspace>`. Then check
-   `enderis auth status` again. When `login.log` instead says:
+   It prints `Link: <link>` and `Code: <code>` and exits at once. Your next
+   message gives the user both, before anything else, and tells them to
+   open the link, type the code, choose the workspace if the page asks, and
+   approve. The code works for 10 minutes. Then start the `--wait` command
+   it printed, in the background:
 
-   - the login `expired`: run the command again and give the new link and
-     code;
-   - the login `was denied`: run it again, give the new link and code, and
-     tell the user to approve;
-   - `Nothing was saved` (the browser approved another workspace): run the
-     same command again, and tell the user to choose the workspace the
-     request names on the page.
+   ```sh
+   enderis auth login <the flags on that line> --wait > login.log 2>&1 &
+   ```
+
+   Do not end your turn to wait: go on with the steps that do not need
+   sign-in (intake, research, the brief, the playground and agent files).
+   When only signed-in steps remain, wait inside this turn: read
+   `login.log` every 10 seconds, for up to 10 minutes, until it ends with
+   `Connected to <org>/<workspace>`. Then check `enderis auth status`
+   again. When `login.log` instead says:
+
+   - the login `expired` or `was denied`: run the sign-in command again,
+     give the new link and code at once, and start `--wait` again;
+   - `Nothing was saved` (the browser approved another workspace): do the
+     same, and tell the user to choose the workspace the request names on
+     the page.
 
 You do not need the Enderis MCP tools for this flow. If you already have
 them, you may use them later as extra help.
