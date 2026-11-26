@@ -70,8 +70,9 @@ Answer these before writing code. Write the answers into the body of
    the app calls any outside service, because only an app Enderis starts gets
    the simulated services. Use `app: attached` (you start the app before the run) or
    `app: managed` (the driver's `start` and `stop` hooks start one copy per run
-   slot) only for an app that calls no outside service, or one Enderis cannot
-   launch yet (an app that is not Node or Python). If the
+   slot) only for an app that calls no outside service. An app that is not
+   Node or Python runs in a container (section "An app in another language").
+   If the
    repository has no front door Enderis can launch or drive, use `app: harness`
    (section "A harness"), including when the only entry point is a terminal CLI,
    console script or serverless platform other than Vercel/Lambda.
@@ -372,8 +373,13 @@ ready: /healthz
   It publishes only the front door's port, on a free loopback port, and
   removes every other published port. No service restarts. Database and cache
   services start empty for the run. After the run, Enderis removes the
-  containers, networks, volumes and the images the run built. If the command
-  is killed, the next `enderis run` of the agent removes them.
+  containers, networks and volumes. If the command is killed, the next
+  `enderis run` of the agent removes them.
+- Images are built once per command, by its first run (up to 45 minutes);
+  `enderis serve` builds once per batch of runs. Enderis keeps the last build
+  for each checkout and agent, so the next command builds nothing when nothing
+  changed. A start command that compiles (`cargo run`, `go run`) compiles in
+  every run: compile in the Dockerfile instead.
 - The front door service and every service built from the repository get the
   network guard, the simulated services and the model keys. Their containers must run Node
   18.19 or later, or Python. If the guard does not load in one of them (for
@@ -398,13 +404,148 @@ ready: /healthz
   host`. Do not edit the customer's compose files. Write a compose file for
   runs in `.enderis/` without these and list it in `files`. Paths in a compose
   file are relative to the folder of the first file.
-- The machine that runs the evals needs Docker with Compose 2.24 or later.
-  macOS and Windows use Docker Desktop on that machine. Linux needs a local
-  Docker Engine; Docker Desktop for Linux and remote engines are unsupported.
-  Enderis connects containers back to this machine. Do not change the agent
-  or driver to allow `host.docker.internal`.
-  Under deny, a container reaches host loopback only at this run's own listeners
-  or an explicitly allowed destination.
+- The machine that runs the evals needs Docker or rootless Podman, and a
+  Compose v2 program, 2.24 or later (Enderis downloads one when there is none,
+  unless `ENDERIS_NO_COMPOSE_FETCH` is set). `ENDERIS_CONTAINER_ENGINE` picks
+  the engine. The Python `podman-compose` is not supported. On Podman, a build
+  may set only `context`, `dockerfile`, `dockerfile_inline`, `target`, `args`
+  with values, `labels`, `additional_contexts` (not `service:`) and `tags`;
+  anything else is refused. macOS and Windows
+  use Docker Desktop on that machine. Linux needs a local Docker Engine or
+  rootless Podman; Docker Desktop for Linux and remote engines are unsupported.
+- A Node or Python app's containers reach this machine back through the run's
+  gate, as `enderis-gate:<port>`. Do not change the agent or driver to allow
+  it. Under deny, a container reaches host loopback only at this run's gate
+  ports or an explicitly allowed destination.
+- A run with a gate needs Podman 5.0.0 or later on Podman, and refuses a
+  service or network named `enderis_gate`, `enderis_probe`, `enderis_box` or
+  `enderis_out`, and a guarded service with `network_mode: bridge`.
+- The first run of each CLI release downloads the gate from the CLI's GitHub
+  release. On a restricted or air-gapped machine, and for a CLI built from
+  source, set `ENDERIS_GATE_IMAGE` to a gate image.
+
+### An app in another language
+
+For a Go, Rust, Java or other app that is not Node or Python, set
+`runtime: other` with a `compose` launch (no other launch takes it). Enderis
+cannot load its guard there, so it holds the app in a box:
+
+- The machine needs Docker 28.0.0 or later, or rootless Podman 5.0.0 or later.
+  Podman that runs as root is refused.
+- Every service joins a network with no route out and publishes nothing, and
+  every container loses `NET_RAW` and `MKNOD`. Any service of any profile
+  with a `network_mode` other than `none` or `service:<name>`, `NET_RAW` or
+  `NET_ADMIN` added, or a `net.*` sysctl is refused. So is a service or
+  network named `enderis_gate`, `enderis_probe`, `enderis_box` or
+  `enderis_out`, and a project that reads an `ENDERIS_` variable (compose
+  files, `.env`, `env_file`). `COMPOSE_PROFILES` in `.env` does not apply.
+- A gate container Enderis adds is the only way in or out. The driver reaches
+  the front door through it (`ENDERIS_APP_URL`). The app's proxy variables
+  point at the gate, and the gate answers each name the run knows.
+- Exact `allow:` hosts go through the run's proxy, and so do model hosts
+  unless their calls are recorded (below); a run with no proxy does not start. A simulated service's production host over HTTPS
+  is answered in the box (a fixed host, below). Every other host is refused
+  and listed as blocked.
+- A simulated REST or MCP boundary reaches the app through a door at the gate:
+  give the boundary a `url` gate for the variable that holds its address, and
+  Enderis sets it to `http://enderis-gate:<port>` plus the declared `url`'s
+  path (ports from 7101, fixed by boundary order). The door forwards to the
+  run's route like the origin adapters (credentials removed, the run's bearer
+  added, paging links back to the door). The result lists door use in
+  `served_by_door`.
+- Fixed hosts: a client with a simulated boundary's production host written
+  in (`https://api.github.com`, port 443), and links in simulated replies,
+  reach the simulation too, so such a boundary needs no `url` gate. Enderis
+  makes a certificate authority for the run in memory (no key on disk), adds
+  it to each service image's own certificate bundle, and mounts it read-only
+  in the run's containers only; the image and this machine do not change.
+  Fixed hosts cover clients that read the image's certificate bundle. The
+  result lists this use in `served_as_fixed_host`. A pinned certificate, roots built into
+  the program, a client that keeps its own trust store (such as Java), or an
+  HTTP/2- or gRPC-only client cannot be simulated: the result lists the host
+  under `cannot_simulate` and nothing leaves the machine. Such an app needs a
+  `url` gate for that boundary. When an entrypoint that runs `update-ca-certificates` fails on the
+  read-only bundle, Enderis starts that service once more with the authority
+  as a file in `/usr/local/share/ca-certificates/` instead, and the run says
+  so only if that fails too. A boundary with neither a `url` gate nor an HTTPS
+  production host is listed under `cannot_mock`. Do not change the agent for
+  any of these.
+- Enderis starts the gate, tests that the box holds, and only then starts the
+  app. A failure stops the run and names the engine. A passing run has
+  `network_contained: true`.
+- While a command's runs go on, Enderis prepares the next runs' boxes (gate,
+  test, databases started, the app's containers created), at most
+  `--parallel` of them. Each box serves one run; the app starts when its run
+  begins.
+- The gate image is built on this machine from the CLI release's gate program,
+  checked by SHA-256, and built again when its tag names another image.
+  `ENDERIS_GATE_IMAGE` names another gate image.
+- When the compose files mount nothing from the repository, runs use the
+  folder itself with no copy. Otherwise each copy leaves out a path only when
+  every build context that holds it ignores it (`<Dockerfile>.dockerignore`,
+  else `.dockerignore`).
+- There are no in-process route adapters (doors and fixed hosts take their
+  place) or model-observability package in the box, and a live-read or
+  own-host boundary is refused.
+- Model calls: when the run keeps model traces, the CLI records them itself.
+  At the edge, it answers a model host over HTTPS with the run's certificate,
+  sends each request on unchanged to the real provider through the run's
+  proxy, and passes the reply back unchanged. For an app that does not accept
+  the run's certificate, list the SDK's address variables under `model_door`
+  in `launch.compose` (`OPENAI_BASE_URL`, `OPENAI_API_BASE`,
+  `ANTHROPIC_BASE_URL`); the variable then points at a door on the gate that
+  forwards to the address it held, else the provider's own, and records the
+  call. Key headers are never kept; redact paths, scrubbing and the span
+  limits apply as for in-process capture. Formats read: OpenAI Chat
+  Completions, OpenAI Responses, Anthropic Messages. Without a door, an app
+  that refuses the certificate is not recorded on that host, and its first
+  call there fails (a known limit; later calls pass on unrecorded). The
+  result's `model_capture` names the method per host (`edge`, `model_door`,
+  `none`). `enderis test` prints it in one line, and for `none` names the
+  variable to add to `launch.compose.model_door`.
+
+Writing the files for such an app (`enderis inspect` reports it as
+`compiled_app`, for Rust, Go, the JVM or .NET):
+
+- The driver is still a Python or Node file from the template; it runs on this
+  machine. `runtime: other` with `app: harness` is refused.
+- No compose file: write `.enderis/compose.yaml` and list it in `files`.
+  Paths in it are relative to `.enderis/`, so the build context is the
+  repository:
+
+  ```yaml
+  services:
+    agent:
+      build: {context: .., dockerfile: .enderis/Dockerfile}
+  ```
+
+  Use the repository's own `Dockerfile` (`dockerfile: Dockerfile`) when it has
+  one. Never set model keys or simulated gates in the compose file.
+- No Dockerfile: write `.enderis/Dockerfile`. Compile the app when the image is
+  built and start the compiled program; never `cargo run`, `go run`,
+  `dotnet run` or `gradle run` at start, because each run starts a fresh
+  container and would compile again. Use full image names, such as
+  `docker.io/library/rust:1` or `docker.io/library/golang:1.23`, not `rust:1`.
+  Never edit a repository's own Dockerfile with short names: on Podman,
+  Enderis builds it again with docker.io for short names, except on a machine
+  whose registries config lists registries; there the run names the image, and
+  you write a Dockerfile under `.enderis/` with full names. The run names the Dockerfile
+  that built the image, because it is not the customer's production build.
+- A Rust Dockerfile that builds the dependencies first, with a placeholder
+  `src/main.rs`, runs `touch src/main.rs` after it copies the real source and
+  before the real build; otherwise cargo can keep the placeholder program.
+- Declare each service the app calls in `.enderis/boundaries.md`, with its
+  production `url` and, when the app reads its address from a variable, that
+  variable as a `url` gate (the `enderis-onboard` skill, "2. Declare what the
+  code actually does"). Each declared variable name must appear in a file of
+  the repository. Declare the model key names under `model_keys:`.
+- In a run the app reaches its real model, the exact hosts under `allow:`, and
+  each declared REST or MCP service through its door or at its production
+  host over HTTPS (a fixed host). A boundary with neither a `url` gate nor an
+  HTTPS production host on port 443 is listed in `cannot_mock`, and a call to
+  its host is refused and named. A client that speaks only gRPC or HTTP/2
+  cannot reach a simulated service.
+  The onboard result's `limits` lists what the box does not cover; report it.
 
 ### A harness
 

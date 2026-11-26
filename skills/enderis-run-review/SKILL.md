@@ -45,12 +45,17 @@ agent), so you can see which evals have no runs.
 ```sh
 enderis runs get <run_id> [<run_id>...]          # verdict, assertions, tools called
 enderis runs get <run_id> --full                 # the whole trajectory, as JSON
+enderis runs get <run_id> --evidence             # the evidence as readable text
 ```
 
 `enderis runs get` gives each assertion's result and the tools the agent
 called in order. `--full` gives the whole trajectory: the agent's messages,
 its tool calls with their arguments and results, and each assertion's result.
-Over MCP, use `get_run { run_id, view: "summary" }`, then `get_run { run_id }`.
+`--evidence` gives one text with what the eval tests, the agent's
+instructions, each assertion's result, the playground diff, the starting
+playground and the trace.
+Over MCP, use `get_run { run_id, view: "summary" }`, then `get_run { run_id }`
+or `get_run { run_id, view: "evidence" }`.
 A person can open the same run in the web app.
 
 - Read the eval's `evaluator.py` (in the repository, with

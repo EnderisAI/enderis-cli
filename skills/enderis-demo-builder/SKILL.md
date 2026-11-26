@@ -454,16 +454,17 @@ Do this without asking for a yes, while the user chats.
    them to the brief:
 
    ```markdown
-   - S1. <Situation in the business's words>. Expected: <the outcome>. Covers R1, R3. Evals: s1_<name>. [W1]
+   - S1. <Situation in the business's words>. Expected: <the outcome>. Covers R1, R3. Evals: <eval_name>. [W1]
    ```
 
    Tell the user the list in one short message. They can add or drop
    scenarios at any time; do not wait for them.
 4. **Write the evals.** Follow the `enderis-eval-author` skill, and take its
-   proposed answers without waiting. Write one eval per scenario. Start each
-   eval's name with its scenario id, for example `s3_night_emergency`, and
-   list each scenario's eval names in the brief, so the brief and the evals
-   trace in both directions. Every eval has a `scripted.json`. Use rules
+   proposed answers without waiting. Write one eval per scenario. Name each
+   eval with a short phrase that says what it tests, for example
+   `night_emergency_burst_pipe`, never with the scenario id (`s3_...`): owners
+   see the name in every list. List each scenario's eval names in the brief,
+   so the brief and the evals trace in both directions. Every eval has a `scripted.json`. Use rules
    shared by every scenario as standards in `standards/<name>.py`, set with
    `standards:` in the agent's frontmatter, not as copies in each evaluator.
 

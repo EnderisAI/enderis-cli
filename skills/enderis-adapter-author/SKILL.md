@@ -200,7 +200,11 @@ the exact names and inputs. Get them in this order:
 1. **Read the code first.** The tool names the agent filters or calls, the
    routes and request bodies it sends, and the server's own definitions in
    its installed package (`node_modules/<package>`, the Python
-   `site-packages/<package>`, or the published package source). For each tool
+   `site-packages/<package>`, or the published package source). For an app in
+   another language (Rust, Go, the JVM, .NET), read the client in the
+   repository and the published source of its library (a crate, Go module,
+   Maven artifact or NuGet package). The interface's `upstream["endpoint"]` is
+   the origin of the boundary's declared `url`. For each tool
    write down its name, description and input schema; for each route its
    method, path, inputs and reply.
 2. **Probe an MCP server** only if the code does not show the tools, and only
@@ -364,7 +368,15 @@ For a client that needs a bootstrap cookie, return it with
 (such as `Domain=.example.com`), so the client sends it to the other origins too.
 List `Cookie` in `http_headers` to read it back as the `cookie` argument;
 only then does the agent's `Cookie` reach the interface, and it is recorded
-like any other argument.
+like any other argument. Import refuses any other credential-named header in
+`http_headers` (such as `X-Api-Key` or `X-Auth-Token`; idempotency keys are
+allowed), and refuses a model provider's API as `upstream.endpoint` or an auth
+origin: Anthropic, OpenAI (also `*.api.openai.com`), Gemini, Vertex AI, Azure
+OpenAI and Azure AI (`*.openai.azure.com`, `*.cognitiveservices.azure.com`,
+`*.services.ai.azure.com`), Amazon Bedrock runtime, Mistral, Groq, xAI,
+DeepSeek, Cohere, Together AI, Fireworks AI, OpenRouter, the Vercel AI Gateway
+and the Cloudflare AI Gateway. The gateway also drops a credential-named query
+parameter, such as `key` or `api_key`, that the tool's schema does not declare.
 
 ## 3. Test the service
 

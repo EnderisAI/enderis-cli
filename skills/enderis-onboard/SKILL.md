@@ -109,6 +109,12 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
   list the client's extra bootstrap and auth origins as a space-separated
   string in the interface's `upstream.auth_origins` and serve their routes there.
   Onboarding records them; onboard again after changing them, or runs refuse.
+  A model provider's API is never simulated: its boundary stays live. These are
+  Anthropic, OpenAI (also `*.api.openai.com`), Gemini, Vertex AI, Azure OpenAI
+  and Azure AI (`*.openai.azure.com`, `*.cognitiveservices.azure.com`,
+  `*.services.ai.azure.com`), Amazon Bedrock runtime, Mistral, Groq, xAI,
+  DeepSeek, Cohere, Together AI, Fireworks AI, OpenRouter, the Vercel AI Gateway
+  and the Cloudflare AI Gateway.
   After the first run, read `blocked_egress` warnings for missing hosts of declared boundaries.
   For a client that needs a bootstrap cookie, return it with `http_response(..., cookies=[...])` and give it the production `Domain` (such as `Domain=.example.com`), so the client sends it to the other origins too; list `Cookie` in `http_headers` to read it back as the `cookie` argument. The agent's cookies reach only an interface that lists `Cookie`, and a listed `Cookie` is recorded in the run like any other argument.
 - A `declare:` block replaces a wrong inferred transport or target under the
@@ -116,6 +122,16 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
   and its literal `server` or `url`; follow declaration errors to correct it.
 - For unknown URL clients, use `declare: {transport: streamable_http, url: <url>}`
   for MCP, or `transport: http` for REST, without `constructed_at`.
+- For an app with `runtime: other`, declare every service this way. When the
+  app reads the service's address from a variable, add it as a `url` gate (for
+  example `CRM_URL: url`). Enderis reads no source in that language: each gate
+  name must appear in some file of the repository (build output, vendored
+  code, docs and files Git ignores do not count). In a run the `url` gate names
+  the service's door, which forwards the app's requests to the simulation. A
+  service whose declared `url` is HTTPS on port 443 is also answered at that
+  host in the run (a fixed host), so it needs no `url` gate. A boundary with
+  neither shows in `cannot_mock`, and a call to its host is refused. Report
+  that to the person.
 - Fallback URLs need HTTP(S), no credentials, query or fragment. An MCP fallback
   needs its own origin; stdio and SSE still need a known constructor/hook.
 - REST declarations use `transport: http` and `url`; add `interface:` when the
@@ -136,13 +152,22 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
 - Normal HTTP-agent settings go in `.enderis/launch.md` as `settings: [<ENV_NAME>]`;
   driver settings go in `driver.md`. Export values or use the existing `.env`.
   Never list model keys, boundary gates, port or reserved variables as settings.
+- If the HTTP app already reads the current time from a variable, add `clock: <NAME>`
+  there (for example `clock: AGENT_NOW`). Each run sets it to the playground time,
+  ISO 8601 with an offset, so "today" matches the eval. Never add one to the code.
+- Standing checks for every run go in `.enderis/standards.py` (at most 256 KiB);
+  an eval's `standards:` list picks which apply. Onboard again after a change.
 
 Raw sockets and clients bypassing hooks and proxies may reach production; report this limit.
 `unobserved_connections` reports only observations; `browser: true` marks an agent's own web browser, which Enderis neither simulates nor blocks, even under deny (allowed for reading only). Never claim containment or change customer code.
 
 For `needs_ingress`, `needs_worker` or `no_agent_target` when an app exists, use
 `enderis-agent-driver` to write, check and onboard `.enderis/driver/`; return
-before running evals. Use `agent.reach` and `agent.launch` only for the real front door.
+before running evals. When `enderis inspect` reports `compiled_app` (Rust, Go,
+the JVM, .NET or another language that is not Node or Python), the status is
+`ready` but no target is selected: do not run `enderis onboard` yet. The next
+step is that skill's "An app in another language" (a driver with
+`runtime: other` and `launch.compose`); onboard after the driver exists. Use `agent.reach` and `agent.launch` only for the real front door.
 If no agent exists, use `enderis-demo-builder` and say which default you took.
 
 Keep and test `driver_written` before editing if it reaches the main job;

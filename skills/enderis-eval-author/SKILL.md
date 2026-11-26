@@ -117,7 +117,9 @@ only when the agent cannot learn it any other way: if the playground holds the
 answer, asking was optional and the check fails a correct run.
 
 **`persona:` is who the simulated person is**: a registry persona (`terse`,
-`terse@2`) or an inline `{name, prompt}`; without one, the neutral `cooperative`.
+`terse@2`) or an inline `{name, prompt}`. Without one, `enderis import` gives a
+cast persona its `actors:` entry's persona and refuses one that has neither;
+MCP `create_eval` always uses the neutral `cooperative`.
 A cast entry without `listens:` inherits its roster entry's; `listens: []`
 subscribes to nothing. Only people under the playground's `actors:` can be
 cast; a person in `people:` alone is not on the roster.
@@ -391,6 +393,12 @@ which happened.
 To undo changes to an eval, run `enderis evals restore <name> <version> --agent
 <agent-name>`, or call the MCP tool `restore_eval_version`. It saves that older
 version's definition again as a new version. The playground is not restored.
+Add `--preview` (MCP: `preview: true`) to see the changes first without saving.
+
+Before you save a changed evaluator, check it against a finished run: run
+`enderis evals dry-run <run_id> evals/<name>/evaluator.py`, or call the MCP tool
+`dry_run_evaluator`. It reports what the evaluator would grade on that run's
+stored evidence and stores nothing.
 
 ```sh
 enderis run . --list                          # from the onboarded agent's repo
@@ -414,9 +422,9 @@ If an `enderis` command or MCP call fails and the fix is not clear, run
 ## Feedback from the web app
 
 In the Enderis web app a person marks an agent reply, a check or an eval as
-good or wrong, with their own words (older notes may have none). A line "In
-the app, the person agreed with EnderisAI: ..." after their words is part of
-the note. A member can also send
+good or wrong, with their own words (older notes may have none). A quote
+block under "In the app, the person agreed with EnderisAI:" after their words
+is part of the note. A member can also send
 on what a visitor of a share link left on a reply: a thumb up or down, or a
 comment. Each of these is a note. A note reaches you
 only when a person sends it, and the notes sent to you are your work list.
