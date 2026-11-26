@@ -377,8 +377,9 @@ ready: /healthz
   `enderis run` of the agent removes them.
 - Images are built once per command, by its first run (up to 45 minutes);
   `enderis serve` builds once per batch of runs. Enderis keeps the last build
-  for each checkout and agent, so the next command builds nothing when nothing
-  changed. A start command that compiles (`cargo run`, `go run`) compiles in
+  for each checkout and agent on each engine, so the next command builds
+  nothing when nothing changed; it still prints "Preparing the app's images".
+  A start command that compiles (`cargo run`, `go run`) compiles in
   every run: compile in the Dockerfile instead.
 - The front door service and every service built from the repository get the
   network guard, the simulated services and the model keys. Their containers must run Node
