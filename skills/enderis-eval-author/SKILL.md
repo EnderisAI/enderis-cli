@@ -82,7 +82,9 @@ name in every list and on every run.
 hard (omit if nothing lures the agent), Deciding rule, Right answer, Fails if.
 Every fact comes from the seed or the evaluator; anything the evaluator does not
 grade stays out of Right answer. No preamble, no restated trigger, no tool-call
-narration. Format: https://enderis.ai/docs/evals/writing-evals.
+narration. Import and every save refuse a description without the Ask (or Ticket / Event),
+Deciding rule, Right answer and Fails if labels. Format:
+https://enderis.ai/docs/evals/writing-evals.
 
 **Mark key records.** List in `key_records:` each seed record the deciding rule
 depends on that no check names, such as a consent row. Name a row some tool

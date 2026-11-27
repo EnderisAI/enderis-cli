@@ -399,10 +399,12 @@ ready: /healthz
   run: `container_name`; a volume or network with a fixed `name` or
   `external: true`; a bind mount, build context, extra build context,
   Dockerfile, `env_file` or secret file outside the repository; a remote build
-  context; a volume driver with a host path; `network_mode: host` or
-  `container:…`; `volumes_from: container:…`; `pid`, `ipc` or `userns_mode:
-  host`; `privileged`; `devices`; `cap_add`; `build.ssh`; `build.network:
-  host`. Do not edit the customer's compose files. Write a compose file for
+  context; a volume driver with a host path or other than `local`; a mount
+  type other than `bind`, `volume`, `tmpfs` or `image`; `network_mode: host`
+  or `container:…`; `volumes_from: container:…`; `pid`, `ipc`, `uts`,
+  `cgroup` or `userns_mode: host`; `privileged`, also on a `post_start` or
+  `pre_stop` hook; `devices`; `cap_add`; `use_api_socket`; `build.ssh`;
+  `build.network: host`; `build.privileged`; `build.entitlements`. Do not edit the customer's compose files. Write a compose file for
   runs in `.enderis/` without these and list it in `files`. Paths in a compose
   file are relative to the folder of the first file.
 - The machine that runs the evals needs Docker or rootless Podman, and a
@@ -436,7 +438,9 @@ cannot load its guard there, so it holds the app in a box:
 - Every service joins a network with no route out and publishes nothing, and
   every container loses `NET_RAW` and `MKNOD`. Any service of any profile
   with a `network_mode` other than `none` or `service:<name>`, `NET_RAW` or
-  `NET_ADMIN` added, or a `net.*` sysctl is refused. So is a service or
+  `NET_ADMIN` added, a `net.*` sysctl, `pid`, `ipc` or `uts` set to
+  `container:…`, a `security_opt` other than `no-new-privileges`,
+  `provider`, `runtime` or `cgroup_parent` is refused. So is a service or
   network named `enderis_gate`, `enderis_probe`, `enderis_box` or
   `enderis_out`, and a project that reads an `ENDERIS_` variable (compose
   files, `.env`, `env_file`). `COMPOSE_PROFILES` in `.env` does not apply.

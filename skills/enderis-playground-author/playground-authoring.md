@@ -169,7 +169,7 @@ services:
   and `chat:direct:assistant` is a direct chat with the agent whose key is
   `assistant`.
 - `services` holds each service's starting records, in the shape the
-  service schemas give.
+  service schemas give. Leave it out when the agent uses no services.
 - `epoch` sets the playground clock. Date every record relative to it.
 - `description` is a note for the people who build and review the
   playground. Say there which data is simulated. Agents and evals do not see it.

@@ -116,7 +116,7 @@ claims you checked in source. Full syntax: [onboarding reference](https://enderi
   DeepSeek, Cohere, Together AI, Fireworks AI, OpenRouter, the Vercel AI Gateway
   and the Cloudflare AI Gateway.
   After the first run, read `blocked_egress` warnings for missing hosts of declared boundaries.
-  For a client that needs a bootstrap cookie, return it with `http_response(..., cookies=[...])` and give it the production `Domain` (such as `Domain=.example.com`), so the client sends it to the other origins too; list `Cookie` in `http_headers` to read it back as the `cookie` argument. The agent's cookies reach only an interface that lists `Cookie`, and a listed `Cookie` is recorded in the run like any other argument.
+  For a client that needs a bootstrap cookie, return it with `http_response(..., cookies=[...])` and give it the production `Domain` (such as `Domain=.example.com`), so the client sends it to the other origins too; list `Cookie` in `http_headers` to read it back as the `cookie` argument. Only the cookies a simulated interface set earlier in the run reach an interface that lists `Cookie`; any other cookie the agent holds is removed. A kept `Cookie` is recorded in the run like any other argument.
 - A `declare:` block replaces a wrong inferred transport or target under the
   same id. For known MCP clients, cite the constructor as `constructed_at: path:line`
   and its literal `server` or `url`; follow declaration errors to correct it.
