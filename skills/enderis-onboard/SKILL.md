@@ -65,7 +65,9 @@ Run it in the foreground; it opens the sign-in page in the person's
 browser, prints `Sign in at <link> with the code <code>` and exits at once.
 Your next message always gives the person that line as it is, before
 anything else, in case the page did not open: they cannot see your shell, and the code
-expires in ten minutes. Never guess the org or workspace; omit
+expires in ten minutes. If the login names a workspace id, as the person's
+copied command does, they can also type the code into the box on the Agents
+page they copied the prompt from. Never guess the org or workspace; omit
 `--workspace` if none was named and let the person choose. Then start the
 `--wait` command it printed, in the background:
 

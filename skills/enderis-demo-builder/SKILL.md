@@ -155,7 +155,9 @@ done.
    `Sign in at <link> with the code <code>` and exits at once. Your next message always gives the
    user that line as it is, before anything else, in case the page did not open, and tells them to
    open the link, type the code, choose the workspace if the page asks, and
-   approve. The code works for 10 minutes. Then start the `--wait` command
+   approve. If the login names a workspace id, as the user's copied command does, they can also
+   type the code into the box on the Agents page they copied the prompt from. The code works for
+   10 minutes. Then start the `--wait` command
    it printed, in the background:
 
    ```sh
