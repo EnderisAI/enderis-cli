@@ -58,12 +58,14 @@ Keep the context if connected to the requested workspace. Otherwise run the
 person's exact sign-in command, or use:
 
 ```sh
-enderis auth login --no-browser --workspace <org>/<workspace>
+enderis auth login --workspace <org>/<workspace>
 ```
 
-In your shell it prints the link and code and exits at once. Your next
-message gives the person the link and the code, before anything else: the
-code expires in ten minutes. Never guess the org or workspace; omit
+Run it in the foreground; it opens the sign-in page in the person's
+browser, prints `Sign in at <link> with the code <code>` and exits at once.
+Your next message always gives the person that line as it is, before
+anything else, in case the page did not open: they cannot see your shell, and the code
+expires in ten minutes. Never guess the org or workspace; omit
 `--workspace` if none was named and let the person choose. Then start the
 `--wait` command it printed, in the background:
 
@@ -74,7 +76,7 @@ enderis auth login <the flags on that line> --wait > .enderis/login.log 2>&1 &
 
 Continue reading code while it waits. Poll the log within the turn until
 connected; if it says expired or denied, sign in again from the start and
-give the new link and code at once. Leave approval to the person.
+give the new `Sign in at ...` line at once. Leave approval to the person.
 If `enderis` is not on PATH, try `~/.local/bin/enderis`.
 Contexts and credentials are user-local; repository files cannot select them.
 

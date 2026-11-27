@@ -148,11 +148,12 @@ done.
    command, run exactly that command in the foreground; else:
 
    ```sh
-   enderis auth login --no-browser --workspace <org>/<workspace>
+   enderis auth login --workspace <org>/<workspace>
    ```
 
-   It prints `Link: <link>` and `Code: <code>` and exits at once. Your next
-   message gives the user both, before anything else, and tells them to
+   Run it in the foreground too. It opens the sign-in page in the user's browser, prints
+   `Sign in at <link> with the code <code>` and exits at once. Your next message always gives the
+   user that line as it is, before anything else, in case the page did not open, and tells them to
    open the link, type the code, choose the workspace if the page asks, and
    approve. The code works for 10 minutes. Then start the `--wait` command
    it printed, in the background:
@@ -169,7 +170,7 @@ done.
    again. When `login.log` instead says:
 
    - the login `expired` or `was denied`: run the sign-in command again,
-     give the new link and code at once, and start `--wait` again;
+     give the new `Sign in at ...` line at once, and start `--wait` again;
    - `Nothing was saved` (the browser approved another workspace): do the
      same, and tell the user to choose the workspace the request names on
      the page.

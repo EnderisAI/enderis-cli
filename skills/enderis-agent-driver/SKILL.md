@@ -169,7 +169,7 @@ runtime: node                      # or python: the app's language
 launch:
   process: [npm, run, dev]         # the command a developer runs, no shell
 port_env: PORT                     # or a "{port}" argument in launch instead
-ready: /api/health                 # GET path that answers 2xx when ready
+ready: /api/health                 # optional: GET path that answers 2xx when ready
 app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
 ```
 
@@ -191,7 +191,11 @@ app_env: [NEXT_PUBLIC_SITE_NAME]   # non-secret settings the app needs
   both. If the app opens another port, Enderis finds it.
 - `ready`: a path that answers a plain GET with 2xx once the app takes
   messages (a health route, or `/` when the app serves a page there). Not a
-  path behind a sign-in. Enderis does not follow redirects.
+  path behind a sign-in. Enderis does not follow redirects. Leave `ready` out
+  when the app has no page that returns 2xx; Enderis then counts any HTTP
+  answer at `/` except 502, 503 or 504, on the port Enderis gives the app, as
+  up (a 404 too). Set `ready` when the app does not listen on the port Enderis
+  gives it. Never add a route to the app for it.
 - `app_env`: only settings the app needs that are not secret. Never list a
   model key, a boundary gate or a secret: model keys reach the app from
   onboarding, and gate variables are set by Enderis. Simulated secret gates get
