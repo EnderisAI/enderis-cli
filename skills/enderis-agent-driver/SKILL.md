@@ -71,9 +71,8 @@ Answer these before writing code. Write the answers into the body of
    Enderis starts the app for each run with the run's simulated services and
    switched-off services (section 2, "A launched app"). It is required when
    the app calls any outside service, because only an app Enderis starts gets
-   the simulated services. Use `app: attached` (you start the app before the run) or
-   `app: managed` (the driver's `start` and `stop` hooks start one copy per run
-   slot) only for an app that calls no outside service. An app that is not
+   the simulated services. `app: attached` is kept for existing drivers; new
+   drivers use `app: launched`. An app that is not
    Node or Python runs in a container (section "An app in another language").
    If the
    repository has no front door Enderis can launch or drive, use `app: harness`
@@ -91,23 +90,13 @@ Answer these before writing code. Write the answers into the body of
    repository folder when Enderis can make one, so runs overlap and an open
    `enderis chat` never makes an `enderis run` wait. When the copy fails, the
    run uses the folder itself, one run at a time. An app that ignores the port Enderis gives it goes one
-   run at a time on its own. For `app: attached`, the default
-   `isolation: exclusive` means one run at a time uses the app. Use
-   `isolation: namespace` only when each run gets its own
-   namespace in the shared app (chat ids, user ids, tenant) derived from the
-   run id, the driver reads only that namespace's output, and the app keeps no
-   other state one run can change for another. To run evals in parallel
-   against an app that keeps state, use `app: managed`. A driver written before
-   `exclusive` existed has `namespace`; check it against this rule. With
-   `namespace`, a command that runs more than one run at once warns that the
-   runs use the same app.
+   run at a time on its own.
 6. **Outcomes.** Besides messages, what can the agent do that an eval must see?
    A hand-off to a human is an escalation, which the driver reports. An eval
    sees only channel messages (replies and the simulated people's messages),
    channel records and escalations, and, for a launched app or a harness, the
    records its simulated boundaries change and its MCP calls (the driver does not
-   report them). An attached or managed app's own API calls are
-   not simulated and not seen, so an eval cannot grade them.
+   report them).
 7. **Knowledge.** Where does the agent's knowledge and data live (files,
    database, an API)? The app keeps using it during runs. It decides which evals
    make sense: ones whose answer shows in what the agent says.
@@ -140,21 +129,9 @@ Then:
 
 - `driver.md`: set `name`, `description` (for people), `command` (it runs in
   the driver directory), the `settings` it reads (environment variable names
-  file the driver needs). Set `app: launched` (section "A launched app") or
-  `app: attached` as triage item 3 says, and keep `isolation: exclusive`;
-  change to `namespace` only when triage item 5 allows it.
+  file the driver needs). Set `app: launched` (section "A launched app") as
+  triage item 3 says, and keep `isolation: exclusive`.
 - Optional `timeout:` is seconds per wake answer: default 300, allowed 1..=3600; use 600 for a ten-minute agent, then onboard again. It sets `ctx.request_timeout` and the driver, HTTP and settle budgets.
-- For `app: managed`, add `start` and `stop` (lists that run in the driver
-  directory; list their scripts in `files`). `start` exits 0 only when the copy
-  is ready; `stop` removes the copy and succeeds when there is nothing to stop.
-  Both hooks and the driver get `ENDERIS_SLOT`, `ENDERIS_APP_PORT` (the copy's
-  port), `ENDERIS_INSTANCE` (use it for the compose project name and state
-  files) and `ENDERIS_REPO` (the full path of the folder you onboarded), plus `HOME`, `USER`,
-  the `DOCKER_*` variables and the CA paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`,
-  `REQUESTS_CA_BUNDLE`, `NODE_EXTRA_CA_CERTS`, `CURL_CA_BUNDLE`). `stop` must reach what its
-  `start` made even if the environment changed in between (for example the default Docker context):
-  record what it needs at `start`, keyed by `ENDERIS_INSTANCE`, and exit
-  non-zero when it cannot reach it.
 - `driver.py`: change the requests marked TODO. Keep these parts as they are:
   - every chat id or user id comes from `ctx.run_id`;
   - when `wake["waiting"]` is above zero, the driver may hold back the app's
@@ -178,8 +155,7 @@ stderr; use `ctx.log` for the stop log.
 
 ### A launched app
 
-Set `app: launched` and these fields in `driver.md`; remove `start` and
-`stop`:
+Set `app: launched` and these fields in `driver.md`:
 
 ```markdown
 app: launched
@@ -653,8 +629,8 @@ CLI's own setup and defaults. Copy `template/terminal/` (section 2), set
   `launch.handler`. This check does not inspect `launch.compose` overrides.
 - `driver_listening_socket`: make the driver call the app instead of opening a
   server; the app and a harness driver may listen.
-- `driver_imports_app`: call the app's front door from launched or attached
-  drivers; harness drivers may import it.
+- `driver_imports_app`: call the app's front door from a launched or
+  attached app's driver; harness drivers may import it.
 - `driver_reads_model_key`: do not read, set or copy a model key (a built-in
   one or one listed under `model_keys:`) where the app's process would get it:
   a harness driver's code or `command`, a launched app's `launch.process`, a
@@ -687,7 +663,7 @@ An unavailable Git check reports unknown and does not fail onboarding.
 ```sh
 enderis driver check .enderis/driver           # manifest, hash, describe; runs local code
 enderis onboard <agent-path> --name <agent-name> # finds .enderis/driver/ and says so
-# for app: attached, start the app as in driver.md; a launched app starts with each run
+# a launched app starts with each run
 enderis run <agent-path> --list
 enderis run <agent-path> --eval <name>
 ```

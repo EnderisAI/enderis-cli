@@ -276,9 +276,7 @@ Read live run findings the same way. Fix drivers or declarations, never the agen
 
 ## 5. Start the chat and give the link
 
-For an attached app, check the port is free (`lsof -i :<port>`); if taken, set
-another through an environment override. Start the app as `driver.md` says.
-Pass driver settings to each chat and run: `APP_URL=… enderis chat …`, never in `.env`.
+For a driver that declares `settings`, pass them to each chat and run: `NAME=… enderis chat …`, never in `.env`.
 Start chat in the background before authoring evals:
 
 ```sh

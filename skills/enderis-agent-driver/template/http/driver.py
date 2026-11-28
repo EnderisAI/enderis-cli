@@ -13,7 +13,7 @@ import urllib.request
 
 from enderis.driver import AgentError, AgentTimeout, WakeResult, escalate, reply, serve
 
-APP_URL = os.environ.get("APP_URL", "").rstrip("/")
+APP_URL = os.environ.get("ENDERIS_APP_URL", "").rstrip("/")
 
 
 def call(ctx, method, path, body=None):
@@ -34,7 +34,7 @@ class Driver:
 
     def start(self, ctx):
         if not APP_URL:
-            raise AgentError("APP_URL is not set")
+            raise AgentError("ENDERIS_APP_URL is not set")
         call(ctx, "GET", "/health")  # TODO: the app's health path
         ctx.state["unacked"] = {}  # wake index -> outbox message ids returned on that wake
 
