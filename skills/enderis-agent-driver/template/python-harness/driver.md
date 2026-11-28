@@ -8,8 +8,9 @@ isolation: exclusive
 runtime: python
 ---
 Why a harness: no front door can be launched or driven. TODO: name the front
-door this stands in for, if any (terminal CLI, console script or unsupported
-serverless platform), and keep its prompt, tools, model and settings.
+door this stands in for, if any (full-screen terminal UI, console script or
+unsupported serverless platform), and keep its prompt, tools, model and settings.
+An interactive CLI is driven with the terminal template instead.
 
 What the driver calls: TODO, for example `my_agent.graph.graph`, invoked with
 the conversation so far for each delivery. The reply is the last message.

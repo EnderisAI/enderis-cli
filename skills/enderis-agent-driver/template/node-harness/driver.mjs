@@ -4,7 +4,8 @@
 // services, switched-off services and model keys already in place, and with
 // `@enderis/driver` loaded first, so stdout and stdin are off the protocol
 // before agent code loads. Change the parts marked TODO;
-// `harness-frameworks.md` in the skill shows `ask` for each framework.
+// `enderis skills show enderis-agent-driver harness-frameworks.md` shows `ask`
+// for each framework.
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";

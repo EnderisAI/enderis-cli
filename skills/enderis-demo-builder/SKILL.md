@@ -138,9 +138,8 @@ done.
    command the request gives, else `curl -fsSL https://enderis.ai/install.sh | sh`.
    The installer puts `enderis` in `~/.local/bin`, which your current shell
    may not have on its PATH: call it by its full path,
-   `~/.local/bin/enderis`. The installer also installs the Enderis skills
-   into `~/.agents/skills` (and `~/.claude/skills` when Claude Code is set
-   up). If the skills are missing, run `enderis skills install`.
+   `~/.local/bin/enderis`. The installer also installs the Enderis skills.
+   If a skill is not loaded, run `enderis skills show <skill>` to print it.
 2. **Sign-in.** Check it with
    `enderis auth status --workspace <org>/<workspace>`, using the workspace
    the request names (its id or `org/workspace`). When it prints
@@ -281,11 +280,10 @@ when they come, and import again.
 
 ### 5. One small practice world and the agent
 
-Read the playground guide, `playground-authoring.md` in the
-`enderis-playground-author` skill folder (installed at
-`~/.agents/skills/enderis-playground-author/playground-authoring.md`), and
-the rules in that skill's `SKILL.md`. Before the first chat, do the guide's
-workflow steps 2 and 4 to 6 only. Step 1 (ask the user) is done: the request
+Print the playground guide with
+`enderis skills show enderis-playground-author playground-authoring.md`, and
+follow the rules of the `enderis-playground-author` skill. Before the first
+chat, do the guide's workflow steps 2 and 4 to 6 only. Step 1 (ask the user) is done: the request
 and the source answer it. Skip step 3 (study a starter): the shapes below
 replace it. The guide's audit (its step 7) and evals (its step 8) come
 after the chat, in step 7 of this skill. The guide's blueprint section opens with a complete

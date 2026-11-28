@@ -31,12 +31,16 @@ A REST API the person will use only as a live read needs no adapter: declare
 it without `interface:` (the `enderis-onboard` skill, "3. Connect boundaries and
 check onboarding again").
 
-`template/` in this skill folder (installed at
-`~/.agents/skills/enderis-adapter-author/template/`) is a complete adapter
-that imports as it is: a parts desk service with two operations, an MCP
-interface (`interfaces/mcp.py`) with two tools, a REST interface
-(`interfaces/rest.py`) with one route, and a tool test file. Start from it,
-and keep the interface you need.
+When a skill this one names is not loaded, run `enderis skills show <skill>`
+to print it. Do not read skill files from your home folder.
+
+This skill's `template/` is a complete adapter that imports as it is: a
+parts desk service with two operations, an MCP interface
+(`interfaces/mcp.py`) with two tools, a REST interface (`interfaces/rest.py`)
+with one route, and a tool test file. Start from it, and keep the interface
+you need. Print a template file with
+`enderis skills show enderis-adapter-author template/<file>`; redirect the
+output to copy it, as in section 2.
 
 ## An interface over a built-in service
 
@@ -122,7 +126,8 @@ class CalendarRest:
 ```
 
 If the built-in holds the right records but lacks an operation, add optional
-`.enderis/services/<builtin>/operations.py` from `template/operations.py`.
+`.enderis/services/<builtin>/operations.py` from `template/operations.py`
+(`enderis skills show enderis-adapter-author template/operations.py`).
 Export one stateless `Operations` class with ordinary `@op` methods taking
 `(self, ctx, store, args)`. Give each op a unique `x_`-prefixed name, then set
 `canonical="<builtin>.x_name"` and use `call.invoke` in the facade. Do not add
@@ -246,13 +251,15 @@ input schema. Add more later when an eval needs them.
 
 ## 2. Write the service and the interface
 
-Copy the template into the repository:
+Copy the template into the repository. Keep `mcp.py` for an MCP server and
+`rest.py` for a REST API:
 
-```text
-.enderis/services/<service>/behavior.py             # from template/behavior.py
-.enderis/services/<service>/interfaces/mcp.py       # from template/interfaces/mcp.py, for an MCP server
-.enderis/services/<service>/interfaces/rest.py      # from template/interfaces/rest.py, for a REST API
-.enderis/tests/tools/<service>.yaml                 # from template/tests/tools/parts_desk.yaml
+```sh
+mkdir -p .enderis/services/<service>/interfaces .enderis/tests/tools
+enderis skills show enderis-adapter-author template/behavior.py > .enderis/services/<service>/behavior.py
+enderis skills show enderis-adapter-author template/interfaces/mcp.py > .enderis/services/<service>/interfaces/mcp.py
+enderis skills show enderis-adapter-author template/interfaces/rest.py > .enderis/services/<service>/interfaces/rest.py
+enderis skills show enderis-adapter-author template/tests/tools/parts_desk.yaml > .enderis/tests/tools/<service>.yaml
 ```
 
 Then change the parts marked TODO:

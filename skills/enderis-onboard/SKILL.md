@@ -15,6 +15,8 @@ Use the CLI throughout; do not set up MCP or restart the session.
 ## Rules throughout
 
 - Take the defaults below without asking. Tell the person which you took.
+- When a skill named here is not loaded, run `enderis skills show <skill>` to
+  print it. Do not read skill files from your home folder.
 - Customer code is read-only. Write only under `.enderis/`; never change the
   agent's code, config, scripts or prompts, including through launch patches.
   Never write a launcher under `.enderis/` (`driver_launch_in_enderis`).
@@ -241,8 +243,10 @@ this machine; an unsupported route or API defect belongs to Enderis.
 
 ## 4. Build a first playground and run the health check
 
-Use `enderis-playground-author` and its `playground-authoring.md`. For this first
-playground, skip the interview and audit; take these defaults:
+Use `enderis-playground-author` and its guide, which
+`enderis skills show enderis-playground-author playground-authoring.md`
+prints. For this first playground, skip the interview and audit; take these
+defaults:
 
 - Sources: the real system prompt, its tools and the person's agent description.
 - Services: every simulated connection's service, plus the driver's channel service.
@@ -290,6 +294,9 @@ While the person chats, deepen the playground with history, ordinary noise and
 the records the evals need; import it again. The open chat keeps its own version.
 Use `enderis-eval-author` to draft three to five evals under `.enderis/evals/`:
 the main job, a hard prompt case, and a case that needs refusal or a question.
+In each, the deciding fact comes from a seeded record, the agent's instructions
+or the playground, never from the trigger. The refusal case must be an action
+the agent can take, through a tool it has.
 Use the real service channel for a service front door.
 Under `interfaces:`, list each adapter as `- {service: <service>, interface: <adapter name>}`;
 otherwise the eval uses `<service>-canonical`. A scripted fixture is optional here;
@@ -311,8 +318,7 @@ switched-off services, reasons and lost coverage; eval names; live run link and 
 For failure, name whether the eval, agent, machine or Enderis is at fault, with run evidence.
 Name any remaining blocker and what is already complete.
 
-Then keep listening: run `enderis feedback --wait`. In the web app the person
-marks replies, checks and evals as good or wrong and sends the notes to you.
-Act on each batch as the `enderis-eval-author` skill says ("Feedback from the
-web app"), close each note, and wait again. Tell the person once that they can
-do this.
+Tell the person once that they can mark replies, checks and evals as good or
+wrong in the web app, then ask you to work on their feedback. When they ask,
+run `enderis feedback` once and act on every open note as the
+`enderis-feedback` skill says, closing each note.

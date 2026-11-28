@@ -8,8 +8,8 @@ isolation: exclusive
 runtime: node
 ---
 Why a harness: no front door can be launched or driven. TODO: name the front
-door this stands in for, if any (terminal CLI, console script or unsupported
-serverless platform), and keep its prompt, tools, model and settings.
+door this stands in for, if any (full-screen terminal UI, console script or
+unsupported serverless platform), and keep its prompt, tools, model and settings.
 
 What the driver calls: TODO, for example the `agent` exported by
 `src/agent.js`, given the conversation so far for each delivery.

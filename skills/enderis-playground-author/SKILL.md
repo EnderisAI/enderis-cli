@@ -11,11 +11,15 @@ description: >-
 
 # Building Enderis playgrounds
 
-Read [playground-authoring.md](playground-authoring.md) in this folder and
+Print the playground guide with
+`enderis skills show enderis-playground-author playground-authoring.md` and
 follow it. It is short and covers sourced and synthetic worlds, source routes
 when pages are blocked, the builder-script workflow, the blueprint format, and
 second playgrounds. The same text is the MCP resource
 `enderis://docs/playground-authoring`.
+
+When a skill this one names is not loaded, run `enderis skills show <skill>`
+to print it. Do not read skill files from your home folder.
 
 Read the schemas of the services you seed before you write any row
 (`enderis tools schemas <service>... --json`), and build the playground with a

@@ -11,6 +11,9 @@ description: >-
 
 # Reviewing Enderis runs
 
+When a skill this one names is not loaded, run `enderis skills show <skill>`
+to print it. Do not read skill files from your home folder.
+
 ## 1. Find the runs
 
 ```sh

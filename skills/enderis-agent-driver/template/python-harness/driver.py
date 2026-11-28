@@ -2,7 +2,8 @@
 
 Enderis starts this file in the agent's folder with the run's simulated services,
 switched-off services and model keys already in place. Change the parts marked
-TODO; `harness-frameworks.md` in the skill shows `ask` for each framework.
+TODO; `enderis skills show enderis-agent-driver harness-frameworks.md` shows
+`ask` for each framework.
 """
 
 import asyncio

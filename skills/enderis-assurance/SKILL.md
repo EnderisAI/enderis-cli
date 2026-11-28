@@ -16,6 +16,9 @@ screens (map approval, coverage, artifacts) show only when Enderis turns on
 the `claims` feature for the organization. Reference:
 https://enderis.ai/docs/evals/claims.
 
+When a skill this one names is not loaded, run `enderis skills show <skill>`
+to print it. Do not read skill files from your home folder.
+
 ## The model
 
 - A **framework** is a list of **controls**, loaded into the workspace. Each

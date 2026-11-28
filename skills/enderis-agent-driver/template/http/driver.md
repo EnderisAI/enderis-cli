@@ -19,7 +19,8 @@ Enderis supplies the server and tracks background work. Keep only request
 mapping or app-specific setup in this driver; never write a handler server here.
 Handler execution requires a v3 runner. Current runners advertise v3.
 
-For Slack Events API input, use template/slack-events/driver.md instead. Declare
+For Slack Events API input, use the slack-events template instead
+(`enderis skills show enderis-agent-driver template/slack-events/driver.md`). Declare
 events: {platform: slack_events_v1, path: /api/events, signing_secret_env: SLACK_SIGNING_SECRET}.
 Remove command, settings and driver.py; Enderis builds, signs and posts the
 event, waits for completion and returns no synthetic replies. Declare the

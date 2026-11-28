@@ -20,6 +20,9 @@ signs and posts their events. `.enderis/` belongs to Enderis and the agent never
 loads it, so adding it does not change the agent. Reference:
 https://enderis.ai/docs/agents/drivers.
 
+When a skill this one names is not loaded, run `enderis skills show <skill>`
+to print it. Do not read skill files from your home folder.
+
 The rule that decides everything: **never change the agent.** Not its code,
 config, scripts or prompts. You may start it with your own compose file or
 environment overrides. If the agent cannot be reached without a change, stop
@@ -74,8 +77,10 @@ Answer these before writing code. Write the answers into the body of
    Node or Python runs in a container (section "An app in another language").
    If the
    repository has no front door Enderis can launch or drive, use `app: harness`
-   (section "A harness"), including when the only entry point is a terminal CLI,
-   console script or serverless platform other than Vercel/Lambda.
+   (section "A harness"), including when the only entry point is a console
+   script or a serverless platform other than Vercel/Lambda. When it is an
+   interactive CLI (typed prompts, arrow-key menus), the harness runs that CLI
+   and answers it as a user would (section "An interactive CLI").
    Use `launch.handler` below for Vercel or Lambda. Next.js keeps its own server
    command. Never write a server or handler launcher under `.enderis/`.
 4. **Time.** Does the app answer at once, or on a timer, a batch or a
@@ -117,7 +122,21 @@ HTTP front door, such as a framework's own dev server (`reach: server`, with
 the command in `launch`). For a harness, copy a harness template instead
 (section "A harness"). Use another
 directory only if the owner asks; then pass `--driver <dir>` to
-`enderis onboard`. Then:
+`enderis onboard`. Copy each template file by printing it into place:
+
+```sh
+mkdir -p .enderis/driver
+# An HTTP front door:
+enderis skills show enderis-agent-driver template/http/driver.md > .enderis/driver/driver.md
+enderis skills show enderis-agent-driver template/http/driver.py > .enderis/driver/driver.py
+# A Slack Events API app, in place of the two lines above:
+enderis skills show enderis-agent-driver template/slack-events/driver.md > .enderis/driver/driver.md
+# An interactive CLI, in place of the two HTTP lines:
+enderis skills show enderis-agent-driver template/terminal/driver.md > .enderis/driver/driver.md
+enderis skills show enderis-agent-driver template/terminal/driver.py > .enderis/driver/driver.py
+```
+
+Then:
 
 - `driver.md`: set `name`, `description` (for people), `command` (it runs in
   the driver directory), the `settings` it reads (environment variable names
@@ -447,7 +466,8 @@ cannot load its guard there, so it holds the app in a box:
   `provider`, `runtime` or `cgroup_parent` is refused. So is a service or
   network named `enderis_gate`, `enderis_probe`, `enderis_box` or
   `enderis_out`, and a project that reads an `ENDERIS_` variable (compose
-  files, `.env`, `env_file`). `COMPOSE_PROFILES` in `.env` does not apply.
+  files, `.env`, `env_file`) other than `ENDERIS_API_URL`, `ENDERIS_API_KEY`
+  and `ENDERIS_WORKSPACE`. `COMPOSE_PROFILES` in `.env` does not apply.
 - A gate container Enderis adds is the only way in or out. The driver reaches
   the front door through it (`ENDERIS_APP_URL`). The app's proxy variables
   point at the gate, and the gate answers each name the run knows.
@@ -561,10 +581,14 @@ Writing the files for such an app (`enderis inspect` reports it as
 When no front door can be launched or driven, the harness calls the same function
 or agent object the front door calls, with the same prompt, tools, model and
 settings; name the front door it stands in for in `driver.md` and the report.
-Copy `template/python-harness/` or `template/node-harness/` (the names
-onboarding prints as `driver_template`) to `.enderis/driver/`, then fill in
-`load_agent` and `ask`. Read [harness-frameworks.md](harness-frameworks.md)
-for the framework calls.
+An interactive CLI can be driven: use section "An interactive CLI". Call the
+app's entry function directly only when its front end cannot be driven, such
+as a full-screen terminal UI (Textual, Ink, curses).
+Copy `template/python-harness/` (`driver.md`, `driver.py`) or
+`template/node-harness/` (`driver.md`, `driver.mjs`), the names onboarding
+prints as `driver_template`, to `.enderis/driver/` with `enderis skills show`
+as above, then fill in `load_agent` and `ask`. For the framework calls, print
+`enderis skills show enderis-agent-driver harness-frameworks.md`.
 
 ```markdown
 front_door: harness
@@ -594,6 +618,34 @@ app_env: [SITE_NAME]               # non-secret settings the agent needs
   servers given in `mcp_servers` are not simulated yet: switch them off under
   `off:` or keep the agent's tools in-process (SDK MCP tools, which the guard
   covers).
+
+### An interactive CLI
+
+When the app's front door is a CLI that asks questions (typed prompts,
+arrow-key menus), the driver runs that CLI and answers it the way a user
+would. Do not import the app and call its entry function: that skips the
+CLI's own setup and defaults. Copy `template/terminal/` (section 2), set
+`COMMAND` to the command a user runs, and write `drive`:
+
+- `Terminal(argv, env=None, cwd=None, cols=120, rows=40)` starts the CLI on a
+  terminal, in the agent's folder, with the driver's environment plus `env`.
+- `term.expect(text_or_regex, timeout_s)` waits for a prompt and returns the
+  screen. It raises `AgentTimeout` when the prompt does not come and
+  `AgentError` when the CLI exits first.
+- `term.line(text)` types an answer and presses enter. `term.send(...)` types
+  named keys (`enter`, `up`, `down`, `space`, `tab`, ...) or text.
+- `term.wait(timeout_s)` waits for the CLI to exit. `term.screen()` is what
+  the CLI printed since the last keys (with their echo), without control
+  codes. Return the part a user reads as the answer.
+- Take each answer from the wake message as a user would: a ticker named in
+  the message is the ticker typed. Keep the CLI's default for a prompt the
+  message does not settle, and name each mapping in `driver.md`.
+- The template starts one CLI per message. For a CLI that is a conversation,
+  keep the `Terminal` in `ctx.state` between wakes and close it in `stop`.
+- The CLI inherits the run's simulated services and guard only as a Python
+  program started with plain `python` or a Python console script. A native
+  program or `python -I` does not get them.
+- Keep `front_door: harness` and `app: harness`.
 
 ## 3. Check, onboard, run
 
